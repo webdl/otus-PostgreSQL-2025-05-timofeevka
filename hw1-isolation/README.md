@@ -3,7 +3,7 @@
 Подключился к PG двумя разными сессиями.
 
 В первой сессии создать и наполнить таблицу для дальнейшей работы:
-```postgresql
+```sql
 BEGIN;
 CREATE TABLE persons
 (
@@ -17,7 +17,7 @@ COMMIT;
 ```
 
 Посмотреть текущий уровень изоляции транзакции:
-```postgresql
+```sql
 SHOW transaction_isolation;
 
 --  transaction_isolation 
@@ -27,17 +27,17 @@ SHOW transaction_isolation;
 ```
 
 Начать новую транзакцию в обеих сессиях:
-```postgresql
+```sql
 BEGIN;
 ```
 
 В первой сессии добавить новую запись без закрытия транзакции:
-```postgresql
+```sql
 INSERT INTO persons(first_name, second_name) VALUES ('sergey', 'sergeev');
 ```
 
 Во второй сессии посмотреть все записи без закрытия транзакции:
-```postgresql
+```sql
 SELECT * FROM persons;
 
 -- id | first_name | second_name 
@@ -51,19 +51,19 @@ SELECT * FROM persons;
 **Ответ:** Нет, потому что транзакция в первой сессии ещё не завершена.
 
 Завершить транзакцию в первой сессии:
-```postgresql
+```sql
 COMMIT;
 ```
 
 Полный код из первой сессии:
-```postgresql
+```sql
 BEGIN;
 INSERT INTO persons(first_name, second_name) VALUES ('sergey', 'sergeev');
 COMMIT;
 ```
 
 Во второй сессии повторить запрос и увидеть новую запись:
-```postgresql
+```sql
 SELECT * FROM persons;
 
 -- id | first_name | second_name 
@@ -79,24 +79,24 @@ SELECT * FROM persons;
 неповторяющееся чтение
 
 Завершить транзакцию во второй сессии:
-```postgresql
+```sql
 COMMIT;
 ```
 ---
 Во второй сессии начать новую транзакцию с другим уровнем изоляции:
-```postgresql
+```sql
 BEGIN;
 SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 ```
 
 В первой сессии нет необходимости в другом уровне изоляции, можно сразу запустить вставку новой записи:
-```postgresql
+```sql
 BEGIN;
 INSERT INTO persons(first_name, second_name) VALUES ('sveta', 'svetova');
 ```
 
 Во второй сессии прочитать всю таблицу. Новых записей не появилось:
-```postgresql
+```sql
 SELECT * FROM persons;
 
 -- id | first_name | second_name 
@@ -111,12 +111,12 @@ SELECT * FROM persons;
 **Ответ:** Нет, потому что транзакция в первой сессии ещё не завершена.
 
 Завершить транзакцию в первой сессии:
-```postgresql
+```sql
 COMMIT;
 ```
 
 Во второй сессии повторить запрос, но новая запись не появится:
-```postgresql
+```sql
 SELECT * FROM persons;
 
 -- id | first_name | second_name 
@@ -132,7 +132,7 @@ SELECT * FROM persons;
 данных, созданного на момент начала транзакции.
 
 Завершить транзакцию во второй сессии и повторите запрос:
-```postgresql
+```sql
 COMMIT;
 SELECT * FROM persons;
 
