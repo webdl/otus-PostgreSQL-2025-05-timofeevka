@@ -1,2 +1,2 @@
 .idea
-pgdata
+deploy/pg/master/data
