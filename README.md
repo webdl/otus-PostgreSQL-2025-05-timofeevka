@@ -3,3 +3,4 @@
 
 ## Выполненные работы
 * [HW01 - Работа с уровнями изоляции транзакции в PostgreSQL](hw1-isolation/)
+* [HW02 - Установка и настройка PostgteSQL в контейнере Docker](hw2-install-on-docker)
