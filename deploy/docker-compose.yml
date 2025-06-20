@@ -1,14 +1,20 @@
-version: '3.9'
-
 services:
-  postgres:
-    image: postgres:latest
-    container_name: postgres_container
+  pg-master:
+    image: postgres:17
+    container_name: pg-master
     environment:
       POSTGRES_USER: pg
       POSTGRES_PASSWORD: admin
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./pg/master/data:/var/lib/postgresql/data
+#      - ./pg/master/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - pg
     restart: unless-stopped
+
+networks:
+  pg:
+    driver: bridge
