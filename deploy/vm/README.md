@@ -25,9 +25,9 @@ Host lh-ubuntu
 ## Установка SSH-ключа
 ```shell
 > cd deploy/vm/
-> ansible-playbook config_authorized_key.yml -
+> ansible-playbook playbooks/config_authorized_key.yml
 ```
-Если всё прошло успешно - то вы сможете выполнять команды ansible без запроса пароля. Например:
+Если всё прошло успешно - то вы сможете выполнять команды ansible без запроса пароля. Пример:
 ```shell
 > ssh-add
 Enter passphrase for /Users/irc/.ssh/id_rsa: 
@@ -41,4 +41,10 @@ lh-ubuntu | SUCCESS => {
     "changed": false,
     "ping": "pong"
 }
+```
+
+# Установка PostgreSQL
+```shell
+> cd deploy/vm/
+> ansible-playbook playbooks/install_db.yml
 ```
