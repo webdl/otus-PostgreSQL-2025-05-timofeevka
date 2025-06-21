@@ -1,8 +1,8 @@
 ---
 - name: Добавить локальный SSH ключ на сервер
   hosts: all
-  become: false
-  gather_facts: true
+  become: no
+  gather_facts: yes
   vars:
     ssh_public_key_path: "~/.ssh/id_rsa.pub"
 
@@ -24,3 +24,12 @@
         user: "{{ whoami_result.stdout }}"
         key: "{{ pubkey.content | b64decode }}"
         state: present
+
+    - name: Настройка входе в sudo без пароля
+      become: yes
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%sudo'
+        line: '%sudo ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
