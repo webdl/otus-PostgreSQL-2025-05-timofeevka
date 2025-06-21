@@ -1,0 +1,35 @@
+---
+- name: Добавить локальный SSH ключ на сервер
+  hosts: all
+  become: no
+  gather_facts: yes
+  vars:
+    ssh_public_key_path: "~/.ssh/id_rsa.pub"
+
+  tasks:
+    - name: Получить текущего пользователя на сервере
+      command: whoami
+      register: whoami_result
+
+    - name: Вывести текущего пользователя на сервере
+      debug:
+        msg: "Подключаемся как пользователь: {{ whoami_result.stdout }}"
+
+    - name: Считать локальный публичный ключ
+      local_action: slurp src="{{ ssh_public_key_path }}"
+      register: pubkey
+
+    - name: Добавить публичный ключ в authorized_keys
+      authorized_key:
+        user: "{{ whoami_result.stdout }}"
+        key: "{{ pubkey.content | b64decode }}"
+        state: present
+
+    - name: Настройка входе в sudo без пароля
+      become: yes
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%sudo'
+        line: '%sudo ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'

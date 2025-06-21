@@ -5,7 +5,7 @@
 https://docs.docker.com/desktop/setup/install/mac-install/
 
 ## Запуск контейнера с PostgreSQL 17
-Для развертывания создан файл [deploy/docker-compose.yml](../deploy/docker-compose.yml), который:
+Для развертывания создан файл [deploy/docker-compose.yml](../deploy/docker/docker-compose.yml), который:
 1. Создает Docker-контейнер с PostgreSQL 17 и пробросом стандартного порта 5432
 2. Монтирует каталог `deploy/pg/master/data` в `/var/lib/postgresql/data` для хранения данных БД вне контейнера
 
@@ -17,7 +17,7 @@ https://docs.docker.com/desktop/setup/install/mac-install/
 
 ## Подключение к БД из контейнера с клиентом
 Для запуска psql в контейнере используется тот же образ, что и для поднятия сервера. Отличительная особенность в том, что сервер не 
-запускается. С учетом конфигурации в [deploy/docker-compose.yml](../deploy/docker-compose.yml) выполнить команду:
+запускается. С учетом конфигурации в [deploy/docker-compose.yml](../deploy/docker/docker-compose.yml) выполнить команду:
 ```shell
 > docker run --rm -it --network deploy_pg postgres psql -h pg-master -U pg -d pg
 ```
@@ -50,7 +50,7 @@ pgAdmin4. Для этого:
    2. Post: 5432
    3. Maintenance database: postgres
    4. Username: pg
-   5. Password: указан в [deploy/docker-compose.yml](../deploy/docker-compose.yml)
+   5. Password: указан в [deploy/docker-compose.yml](../deploy/docker/docker-compose.yml)
    6. Save password: yes
 5. Нажать Save
 
