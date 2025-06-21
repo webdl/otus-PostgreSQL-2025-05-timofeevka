@@ -96,7 +96,7 @@ Writing superblocks and filesystem accounting information: done
 > sudo mount /dev/vdb1 /mnt/pg_data
 ```
 
-Настроить fstab:
+Настроить fstab и перезагрузить ВМ:
 ```shell
 > sudo blkid /dev/vdb1
 /dev/vdb1: UUID="d0800cb8-28f6-4b21-9b4b-ca8ba908edc2" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="92d9a293-01"
@@ -118,4 +118,37 @@ tmpfs                              5.0M     0  5.0M   0% /run/lock
 /dev/vda2                          1.7G  191M  1.4G  12% /boot
 /dev/vda1                          952M  6.4M  945M   1% /boot/efi
 tmpfs                              591M   12K  591M   1% /run/user/1000
+```
+
+## Перенос данных на новый диск
+Остановить PostgreSQL и перенести данные:
+```shell
+> sudo pg_ctlcluster stop 16 main
+> sudo mv /var/lib/postgresql/16/* /mnt/pg_data/
+> sudo chown postgres:postgres /mnt/pg_data/
+```
+
+Запустить PostgreSQL и получить ошибку:
+```shell
+> sudo pg_ctlcluster start 16 main
+Error: /var/lib/postgresql/16/main is not accessible or does not exist
+```
+
+## Настройка нового пути
+Открыть файл настроек PostgreSQL:
+```shell
+> sudo vim /etc/postgresql/16/main/postgresql.conf
+```
+В переменной `data_directory` указать новый путь: `/mnt/pg_data/main`. 
+
+## Запуск сервера и проверка данных
+```shell
+> sudo pg_ctlcluster start 16 main
+> sudo su - postgres
+> psql -d persons -c "select * from test;"
+ id |     text
+----+---------------
+  1 | Hello, World!
+  2 | Foo, bar!
+(2 rows)
 ```
