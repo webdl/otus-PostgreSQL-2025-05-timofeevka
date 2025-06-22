@@ -2,6 +2,8 @@
 postgresql_global_config_options:
   - option: listen_addresses
     value: '*'
+  - option: data_directory
+    value: '/mnt/pg_data/main'
   - option: unix_socket_directories
     value: '{{ postgresql_unix_socket_directories | join(",") }}'
   - option: log_directory
