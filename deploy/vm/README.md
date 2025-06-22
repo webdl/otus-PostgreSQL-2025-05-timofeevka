@@ -7,8 +7,11 @@
 ## Настройка локального ~/.ssh/config
 Для упрощения подключения к ВМ добавьте в файл `~/.ssh/config` запись ниже, заменив данные на свои:
 ```
-Host lh-ubuntu
-   HostName 192.168.64.3
+Host pg-master
+   HostName 192.168.0.240
+   User wdl
+Host pg-slave01
+   HostName 192.168.0.241
    User wdl
 ```
 
@@ -34,7 +37,14 @@ Enter passphrase for /Users/irc/.ssh/id_rsa:
 Identity added: /Users/irc/.ssh/id_rsa (irc@Kirills-MacBook-Pro.local)
 
 > ansible db -m ping
-lh-ubuntu | SUCCESS => {
+pg-master | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/bin/python3.12"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+pg-slave01 | SUCCESS => {
     "ansible_facts": {
         "discovered_interpreter_python": "/usr/bin/python3.12"
     },
