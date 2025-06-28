@@ -1,0 +1,8 @@
+---
+- name: Установка и настройка сервера PostgreSQL 16
+  hosts: db
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - geerlingguy.postgresql

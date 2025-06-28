@@ -1,2 +1,12 @@
+# idea
 .idea
-deploy/pg/master/data
+
+# docker
+data
+
+# python
+.venv
+
+# ansible-galaxy
+.collections
+.roles

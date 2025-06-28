@@ -1,0 +1,6 @@
+roles:
+  - name: geerlingguy.postgresql
+    version: 4.0.1
+collections:
+  - name: community.postgresql
+    version: 4.1.0
