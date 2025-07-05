@@ -1,6 +1,6 @@
 ---
 - name: Установка и настройка сервера PostgreSQL 16
-  hosts: db
+  hosts: db, mini_db
   become: yes
   gather_facts: yes
 
