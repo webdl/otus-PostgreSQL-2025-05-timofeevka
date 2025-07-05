@@ -12,6 +12,7 @@
 ВМ собрана на основе файлов настроек: [mini_db.yml](../deploy/vm/group_vars/mini_db.yml), [inventory.ini](../deploy/vm/inventory.ini)
 
 ## Нагрузочное тестирование сервера (неудачное)
+
 Выполнить вход на ВМ по SSH. Создать БД для тестов и провести тестирование:
 ```shell
 > sudo su - postgres
@@ -56,7 +57,9 @@ latency stddev = 1.320 ms
 initial connection time = 8.228 ms
 tps = 4318.365445 (without initial connection time)
 ```
+
 ### Тюнинг параметров
+
 Применить к серверу следующие параметры:
 ```
 max_connections = 40
@@ -72,11 +75,13 @@ work_mem = 6553kB
 min_wal_size = 4GB
 max_wal_size = 16GB
 ```
+
 Для этого они были помещены в [mini_db.yml](../deploy/vm/group_vars/mini_db.yml), а для применения надо перейти в локальный каталог 
 deploy/vm и выполнить команду:
 ```shell
 > ansible-playbook playbooks/install_db.yml -l pg-slave01
 ```
+
 Выполнить вход на ВМ по SSH и протестировать повторно:
 ```shell
 > sudo su - postgres
@@ -108,17 +113,20 @@ latency stddev = 1.311 ms
 initial connection time = 9.395 ms
 tps = 4329.449660 (without initial connection time)
 ```
+
 ### Выводы
 Сравнивая результаты с предыдущим видно, что ничего не изменилось. Возможно это связано со спецификой виртуализации UTM на MacOS, так 
 как в прошлых экспериментах уже были замечены незначительные улучшения производительности при тюнинге настроек. Поэтому требуется 
 повторное тестирование в другой среде.
 
 ## Нагрузочное тестирование сервера (неудачное, снова...)
+
 С помощью [docker-compose.yml](../deploy/docker/mini_db/docker-compose.yml) разворачивает PostgreSQL в Docker. Для этого надо перейти в 
 каталог deploy/docker/mini_db и выполнить команду:
 ```shell
 docker-compose up -d
 ```
+
 После запуска контейнера провести тот же тест:
 ```shell
 > su postgres
@@ -162,6 +170,7 @@ latency stddev = 0.826 ms
 initial connection time = 18.731 ms
 tps = 5679.624179 (without initial connection time)
 ```
+
 Применить настройки тюнинга выше и повторить тест:
 ```shell
 > pgbench -c8 -P 6 -T 60 -U postgres postgres
@@ -195,3 +204,111 @@ tps = 5756.490531 (without initial connection time)
 Выводы к предыдущему эксперименту оказались неверные, так как при изменении среды виртуализации производительность БД после тюнинга так 
 же не выросла... От чего делаю вывод, что изменение указанных параметров не приводит к улучшению производительности для указанного 
 вызова pgbench (прошу проверяющих дать комментарии, если я где-то ошибся).
+
+## Создание таблицы с текстовыми данными
+**Дисклеймер:** Дальнейшие работы проводятся на ранее созданной ВМ.
+
+Для следующего теста потребуется создать таблицу с одним текстовым полем и заполнить ее 1 млн. записей. Для этого можно воспользоваться 
+SQL запросами:
+```sql
+CREATE DATABASE autovacuum;
+-- Use autovacuum
+
+CREATE TABLE bigdata (
+    data TEXT NOT NULL
+);
+
+INSERT INTO bigdata (data)
+SELECT md5(random()::text)
+FROM generate_series(1, 1000000);
+```
+
+## Проверка работы autovacuum
+
+Найти путь до файла с нашей таблицей:
+```sql
+SELECT pg_relation_filepath('bigdata');
+
+pg_relation_filepath 
+----------------------
+ base/24603/24604
+(1 row)
+```
+
+Зайти на ВМ по SSH и посмотреть размер файла:
+```shell
+> du -sh /mnt/pg_data/main/base/24603/24604
+
+66M	/mnt/pg_data/main/base/24603/24604
+```
+
+Или через SQL запрос:
+```sql
+SELECT pg_size_pretty(pg_relation_size('bigdata'));
+
+pg_size_pretty 
+----------------
+ 65 MB
+(1 row)
+```
+
+Посмотрит на текущее количество "мертвых" записей в таблице с помощью запроса ниже. Сейчас он покажет записей, но пригодится позднее, 
+где я по тексту буду ссылаться на него.
+```sql
+SELECT relname, n_live_tup, n_dead_tup, trunc(100*n_dead_tup/(n_live_tup+1))::float "ratio%", last_autovacuum 
+FROM pg_stat_user_tables 
+WHERE relname = 'bigdata';
+```
+
+Обновляем 5 раз все записи в таблице, добавляя туда по одному символу:
+```sql
+UPDATE bigdata
+SET data = data || 'a';
+
+UPDATE bigdata
+SET data = data || 'b';
+
+UPDATE bigdata
+SET data = data || 'c';
+
+UPDATE bigdata
+SET data = data || 'd';
+
+UPDATE bigdata
+SET data = data || 'e';
+```
+
+С помощью запроса выше посмотреть на кол-во "мертвых" записей и время последнего запуска autovacuum:
+```
+relname | n_live_tup | n_dead_tup | ratio% |        last_autovacuum        
+---------+------------+------------+--------+-------------------------------
+ bigdata |    1000000 |    5000000 |    499 | 2025-07-05 07:57:23.449195+00
+(1 row)
+```
+
+И текущий размер таблицы:
+```sql
+SELECT pg_size_pretty(pg_relation_size('bigdata'));
+
+ pg_size_pretty 
+----------------
+ 391 MB
+(1 row)
+```
+Подождать некоторое время, пока не пройдет autovacuum и посторить запрос:
+```
+ relname | n_live_tup | n_dead_tup | ratio% |        last_autovacuum        
+---------+------------+------------+--------+-------------------------------
+ bigdata |    1000000 |          0 |      0 | 2025-07-05 08:10:25.701237+00
+(1 row)
+```
+Autovaccum прошел. А что с размером таблицы?
+```sql
+SELECT pg_size_pretty(pg_relation_size('bigdata'));
+
+ pg_size_pretty 
+----------------
+ 391 MB
+(1 row)
+```
+Он не изменился.
