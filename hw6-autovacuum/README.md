@@ -438,3 +438,19 @@ pg_relation_filepath
  base/24603/24663 -- ранее был base/24603/24604
 (1 row)
 ```
+
+# Задание со *
+Написать анонимную процедуру, в которой в цикле 10 раз обновятся все строчки в искомой таблице. Не забыть вывести номер шага цикла.
+```sql
+DO $$
+DECLARE
+  _text_to_add text := 'a';
+BEGIN
+  FOR i IN 1..10 LOOP
+	UPDATE bigdata
+	SET data = data || _text_to_add;
+    RAISE NOTICE 'Шаг цикла: %', i;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
