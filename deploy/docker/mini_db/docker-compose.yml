@@ -5,10 +5,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.25" # Так как на Docker Engine выделено 8 CPU
+          cpus: "2"
           memory: "4G"
         reservations:
-          cpus: "0.25" # Так как на Docker Engine выделено 8 CPU
+          cpus: "2"
           memory: "4G"
     environment:
       POSTGRES_USER: postgres
@@ -18,8 +18,8 @@ services:
       - ./data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-#    networks:
-#      - pg
+    #    networks:
+    #      - pg
     restart: unless-stopped
 
 #networks:

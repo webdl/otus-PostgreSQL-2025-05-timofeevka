@@ -138,16 +138,16 @@ done in 0.11 s (drop tables 0.00 s, create tables 0.01 s, client-side generate 0
 > pgbench -c8 -P 6 -T 60 -U postgres postgres
 pgbench (17.5 (Debian 17.5-1.pgdg120+1))
 starting vacuum...end.
-progress: 6.0 s, 278.3 tps, lat 28.450 ms stddev 39.746, 0 failed
-progress: 12.0 s, 279.3 tps, lat 28.556 ms stddev 39.711, 0 failed
-progress: 18.0 s, 290.3 tps, lat 27.753 ms stddev 39.122, 0 failed
-progress: 24.0 s, 283.8 tps, lat 28.128 ms stddev 39.393, 0 failed
-progress: 30.0 s, 285.7 tps, lat 27.941 ms stddev 39.517, 0 failed
-progress: 36.0 s, 281.7 tps, lat 28.442 ms stddev 39.567, 0 failed
-progress: 42.0 s, 286.0 tps, lat 28.009 ms stddev 39.555, 0 failed
-progress: 48.0 s, 297.5 tps, lat 26.941 ms stddev 38.808, 0 failed
-progress: 54.0 s, 296.5 tps, lat 26.807 ms stddev 38.801, 0 failed
-progress: 60.0 s, 268.8 tps, lat 29.752 ms stddev 40.806, 0 failed
+progress: 6.0 s, 6109.2 tps, lat 1.301 ms stddev 0.765, 0 failed
+progress: 12.0 s, 5649.7 tps, lat 1.411 ms stddev 0.829, 0 failed
+progress: 18.0 s, 5553.2 tps, lat 1.436 ms stddev 0.851, 0 failed
+progress: 24.0 s, 5464.1 tps, lat 1.459 ms stddev 0.839, 0 failed
+progress: 30.0 s, 5341.8 tps, lat 1.493 ms stddev 0.882, 0 failed
+progress: 36.0 s, 5431.1 tps, lat 1.468 ms stddev 0.835, 0 failed
+progress: 42.0 s, 5313.7 tps, lat 1.501 ms stddev 0.871, 0 failed
+progress: 48.0 s, 5904.4 tps, lat 1.350 ms stddev 0.801, 0 failed
+progress: 54.0 s, 5970.7 tps, lat 1.335 ms stddev 0.785, 0 failed
+progress: 60.0 s, 6043.0 tps, lat 1.319 ms stddev 0.778, 0 failed
 transaction type: <builtin: TPC-B (sort of)>
 scaling factor: 1
 query mode: simple
@@ -155,28 +155,28 @@ number of clients: 8
 number of threads: 1
 maximum number of tries: 1
 duration: 60 s
-number of transactions actually processed: 17096
+number of transactions actually processed: 340694
 number of failed transactions: 0 (0.000%)
-latency average = 28.067 ms
-latency stddev = 39.519 ms
-initial connection time = 14.851 ms
-tps = 284.539777 (without initial connection time)
+latency average = 1.404 ms
+latency stddev = 0.826 ms
+initial connection time = 18.731 ms
+tps = 5679.624179 (without initial connection time)
 ```
 Применить настройки тюнинга выше и повторить тест:
 ```shell
 > pgbench -c8 -P 6 -T 60 -U postgres postgres
 pgbench (17.5 (Debian 17.5-1.pgdg120+1))
 starting vacuum...end.
-progress: 6.0 s, 270.3 tps, lat 29.502 ms stddev 40.254, 0 failed
-progress: 12.0 s, 263.7 tps, lat 30.269 ms stddev 40.747, 0 failed
-progress: 18.0 s, 249.0 tps, lat 32.176 ms stddev 41.895, 0 failed
-progress: 24.0 s, 264.0 tps, lat 30.300 ms stddev 40.825, 0 failed
-progress: 30.0 s, 286.3 tps, lat 27.825 ms stddev 39.737, 0 failed
-progress: 36.0 s, 330.2 tps, lat 24.221 ms stddev 37.917, 0 failed
-progress: 42.0 s, 274.3 tps, lat 29.261 ms stddev 41.113, 0 failed
-progress: 48.0 s, 252.2 tps, lat 31.655 ms stddev 40.793, 0 failed
-progress: 54.0 s, 277.3 tps, lat 28.843 ms stddev 40.179, 0 failed
-progress: 60.0 s, 301.2 tps, lat 26.451 ms stddev 38.886, 0 failed
+progress: 6.0 s, 5570.4 tps, lat 1.428 ms stddev 0.893, 0 failed
+progress: 12.0 s, 5360.4 tps, lat 1.487 ms stddev 0.918, 0 failed
+progress: 18.0 s, 5763.6 tps, lat 1.384 ms stddev 0.817, 0 failed
+progress: 24.0 s, 5838.7 tps, lat 1.365 ms stddev 0.802, 0 failed
+progress: 30.0 s, 5952.5 tps, lat 1.339 ms stddev 0.809, 0 failed
+progress: 36.0 s, 5942.2 tps, lat 1.342 ms stddev 0.809, 0 failed
+progress: 42.0 s, 5648.2 tps, lat 1.412 ms stddev 0.850, 0 failed
+progress: 48.0 s, 5678.5 tps, lat 1.404 ms stddev 0.807, 0 failed
+progress: 54.0 s, 5903.0 tps, lat 1.350 ms stddev 0.810, 0 failed
+progress: 60.0 s, 5898.0 tps, lat 1.352 ms stddev 0.793, 0 failed
 transaction type: <builtin: TPC-B (sort of)>
 scaling factor: 1
 query mode: simple
@@ -184,12 +184,12 @@ number of clients: 8
 number of threads: 1
 maximum number of tries: 1
 duration: 60 s
-number of transactions actually processed: 16619
+number of transactions actually processed: 345343
 number of failed transactions: 0 (0.000%)
-latency average = 28.890 ms
-latency stddev = 40.247 ms
-initial connection time = 13.571 ms
-tps = 276.588890 (without initial connection time)
+latency average = 1.385 ms
+latency stddev = 0.832 ms
+initial connection time = 14.112 ms
+tps = 5756.490531 (without initial connection time)
 ```
 ### Выводы
 Выводы к предыдущему эксперименту оказались неверные, так как при изменении среды виртуализации производительность БД после тюнинга так 
