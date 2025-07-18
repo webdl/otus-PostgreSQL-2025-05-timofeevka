@@ -1,0 +1,43 @@
+---
+postgresql_global_config_options:
+  - option: listen_addresses
+    value: '*'
+  - option: data_directory
+    value: '/mnt/pg_data/main'
+  - option: unix_socket_directories
+    value: '{{ postgresql_unix_socket_directories | join(",") }}'
+  - option: log_directory
+    value: 'log'
+  - option: max_connections
+    value: '40'
+  - option: shared_buffers
+    value: '1GB'
+  - option: effective_cache_size
+    value: '3GB'
+  - option: maintenance_work_mem
+    value: '512MB'
+  - option: checkpoint_completion_target
+    value: '0.9'
+  - option: wal_buffers
+    value: '16MB'
+  - option: default_statistics_target
+    value: '500'
+  - option: random_page_cost
+    value: '4'
+  - option: effective_io_concurrency
+    value: '2'
+  - option: work_mem
+    value: '6553kB'
+  - option: min_wal_size
+    value: '4GB'
+  - option: max_wal_size
+    value: '16GB'
+postgresql_users:
+  - name: postgres
+    password: postgres
+postgresql_hba_entries:
+  - {type: local, database: all, user: postgres, auth_method: peer}
+  - {type: local, database: all, user: all, auth_method: peer}
+  - {type: host, database: all, user: all, address: '127.0.0.1/32', auth_method: "{{ postgresql_auth_method }}"}
+  - {type: host, database: all, user: all, address: '::1/128', auth_method: "{{ postgresql_auth_method }}"}
+  - { type: host, database: all, user: all, address: '0.0.0.0/0', auth_method: md5 }
