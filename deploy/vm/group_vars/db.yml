@@ -44,6 +44,10 @@ postgresql_global_config_options:
     value: '2'
   - option: checkpoint_timeout
     value: '30'
+  - option: logging_collector
+    value: 'on'
+  - option: log_checkpoints
+    value: 'on'
 postgresql_users:
   - name: postgres
     password: postgres

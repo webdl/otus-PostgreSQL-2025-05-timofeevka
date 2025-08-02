@@ -86,3 +86,45 @@ select pg_wal_cycle_all();
 > pgbench -i -s 10 persons
 > pgbench -c 10 -j 2 -t 50000 persons
 ```
+
+## Настройка сервера
+Вернем предыдущие настройки `min_wal_size` и `max_wal_size` и зададим параметр `checkpoint_timeout` равный 30. Также, чтобы отслеживать 
+выполнение контрольных точек, выставим параметры `logging_collector` и `log_checkpoints` в значение "on" (по умолчанию последний уже задан,
+но не будет лишним прописать его принудительно). Все настройки производятся через файл [db.yml](../deploy/vm/group_vars/db.yml).
+
+Срез измененных настроек:
+```
+min_wal_size = 1GB
+max_wal_size = 4GB
+logging_collector = on
+log_checkpoints = on
+```
+
+Применим настройки через команду ниже и дождемся перезапуска кластера:
+```shell
+> ansible-playbook playbooks/install_db.yml -l db
+```
+
+### Проверка логирования контрольных точек
+Найдем расположение лог-файлов:
+```sql
+SHOW data_directory; -- каталог с данными
+SHOW log_directory;  -- каталог с лог-файлами в каталоге с данными
+```
+В моем случае лог-файлы находятся по пути `/mnt/pg_data/main/log`, а сам лог-файл называется `postgresql-2025-08-02_093617.log`.
+
+Выполним shell-команду потокового чтения файла:
+```shell
+> tail -f /mnt/pg_data/main/log/postgresql-2025-08-02_093617.log
+```
+
+Выполним принудительную запись контрольной точки:
+```sql
+CHECKPOINT;
+```
+
+Увидим, что контрольные точки логируются:
+```
+2025-08-02 09:40:49.732 UTC [7221] LOG:  checkpoint starting: immediate force wait
+2025-08-02 09:40:49.747 UTC [7221] LOG:  checkpoint complete: wrote 0 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.007 s, sync=0.001 s, total=0.016 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=0 kB; lsn=32/CD36E7A8, redo lsn=32/CD36E770
+```
