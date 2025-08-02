@@ -42,6 +42,8 @@ postgresql_global_config_options:
     value: '4'
   - option: max_parallel_maintenance_workers
     value: '2'
+  - option: checkpoint_timeout
+    value: '30'
 postgresql_users:
   - name: postgres
     password: postgres
