@@ -48,6 +48,10 @@ postgresql_global_config_options:
     value: 'on'
   - option: log_checkpoints
     value: 'on'
+  - option: shared_preload_libraries
+    value: 'pg_prewarm, pg_stat_statements'
+  - option: pg_prewarm.autoprewarm
+    value: 'true'
 postgresql_users:
   - name: postgres
     password: postgres
