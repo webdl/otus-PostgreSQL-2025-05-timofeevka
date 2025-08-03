@@ -52,6 +52,10 @@ postgresql_global_config_options:
     value: 'pg_prewarm, pg_stat_statements'
   - option: pg_prewarm.autoprewarm
     value: 'true'
+  - option: log_lock_waits
+    value: 'on'
+  - option: deadlock_timeout
+    value: '200ms'
 postgresql_users:
   - name: postgres
     password: postgres
