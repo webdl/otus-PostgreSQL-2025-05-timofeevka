@@ -225,3 +225,28 @@ SELECT * FROM student_count_per_course;
  Разговоры о важном |             0
 (4 rows)
 ```
+
+## Процент студентов с оценкой 'A' или 'B' по курсу
+
+```sql
+CREATE VIEW high_grade_percentage_per_course AS
+SELECT c.course_name,
+       ROUND(SUM(CASE WHEN e.grade IN ('A', 'B') THEN 1 ELSE 0 END) * 100.0 /
+             NULLIF(COUNT(e.student_id), 0), 2
+       ) AS high_grade_percentage
+FROM courses c
+         NATURAL LEFT JOIN enrollments e
+GROUP BY c.course_name;
+```
+
+```sql
+SELECT * FROM average_grade_per_course;
+
+    course_name     | high_grade_percentage 
+--------------------+-----------------------
+ История            |                 50.00
+ Математика         |                 50.00
+ Физика             |                100.00
+ Разговоры о важном |                      
+(4 rows)
+```
