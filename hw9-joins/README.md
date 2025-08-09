@@ -63,7 +63,9 @@ INSERT INTO enrollments (student_id, course_id, grade)
 VALUES (1, 1, 'A'), -- Иван Иванов, Математика
        (1, 2, 'B'), -- Иван Иванов, Физика
        (2, 1, 'C'), -- Мария Петрова, Математика
-       (3, 3, 'B'); -- Сергей Сидоров, История
+       (2, 3, 'F'), -- Мария Петрова, История
+       (3, 3, 'B'), -- Сергей Сидоров, История
+       (3, 2, 'A'); -- Сергей Сидоров, Физика
 ```
 
 # Решение домашнего задания
@@ -167,4 +169,37 @@ SELECT s.name student_name,
 FROM students s
          NATURAL LEFT JOIN enrollments e
          NATURAL RIGHT JOIN courses c;
+```
+
+# Решение задания со *
+
+## Средний балл по курсу
+
+```sql
+CREATE VIEW average_grade_per_course AS
+SELECT c.course_name,
+       ROUND(
+               AVG(CASE e.grade
+                       WHEN 'A' THEN 5
+                       WHEN 'B' THEN 4
+                       WHEN 'C' THEN 3
+                       WHEN 'D' THEN 2
+                       WHEN 'F' THEN 2
+                       ELSE 0
+                   END)::numeric, 2) AS avg_grade
+FROM courses c
+         NATURAL LEFT JOIN enrollments e
+GROUP BY c.course_name;
+```
+
+```sql
+SELECT *
+FROM average_grade_per_course;
+
+    course_name     | avg_grade 
+--------------------+-----------
+ История            |      3.00
+ Математика         |      4.00
+ Физика             |      4.50
+ Разговоры о важном |      0.00
 ```
