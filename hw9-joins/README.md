@@ -193,8 +193,7 @@ GROUP BY c.course_name;
 ```
 
 ```sql
-SELECT *
-FROM average_grade_per_course;
+SELECT * FROM average_grade_per_course;
 
     course_name     | avg_grade 
 --------------------+-----------
@@ -202,4 +201,27 @@ FROM average_grade_per_course;
  Математика         |      4.00
  Физика             |      4.50
  Разговоры о важном |      0.00
+```
+
+## Количество студентов, записанных на каждый курс
+
+```sql
+CREATE VIEW student_count_per_course AS
+SELECT c.course_name,
+       COUNT(e.student_id) AS student_count
+FROM courses c
+         NATURAL LEFT JOIN enrollments e
+GROUP BY c.course_name;
+```
+
+```sql
+SELECT * FROM student_count_per_course;
+
+    course_name     | student_count 
+--------------------+---------------
+ История            |             2
+ Математика         |             2
+ Физика             |             2
+ Разговоры о важном |             0
+(4 rows)
 ```
