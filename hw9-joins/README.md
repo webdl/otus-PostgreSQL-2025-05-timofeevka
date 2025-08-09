@@ -171,7 +171,7 @@ ORDER BY c.course_name;
 (7 rows)
 ```
 
-### Кросс-соединение (CROSS JOIN) — все возможные пары студент-курс
+### Кросс-соединение (CROSS JOIN) — все возможные пары студент-курс-оценка
 
 ```sql
 SELECT s.name student_name,
