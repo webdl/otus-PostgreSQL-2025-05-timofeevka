@@ -10,7 +10,7 @@
 
 ## Функция генерации текста
 
-Для использования GIN индекса используем простую функцию генерации lorem ipsum текста.
+Для работы с GIN индексом используем простую функцию генерации lorem ipsum текста.
 
 Установим требуемое расширение:
 
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 ```
 
-Наполним ее 3,000,000 сгенерированными данными (генерация занимает ~2,5 минуты):
+Наполним ее 1,000,000 сгенерированными данными (генерация занимает ~45 сек):
 
 ```sql
 INSERT INTO users (username, email, age, rating, is_active, meta, about, created_at)
@@ -84,23 +84,222 @@ SELECT
 	lorem_ipsum(255),
 	-- created_at: случайные даты с 2024 по середину 2025
     timestamp '2024-01-01 00:00:00' + (random() * 550)::int * interval '1 day'
-FROM generate_series(1, 3000000) gs;
+FROM generate_series(1, 1000000) gs;
 ```
 
 Пример полученных записей:
 
 ```
- id | username |      email      | age | rating | is_active |               meta                |                                                                                                                              about                                                                                                                              |     created_at      
-----+----------+-----------------+-----+--------+-----------+-----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------
-  1 | user_1   | user_1@mail.ru  |  55 |  56.51 | t         | {"score": 2.38, "status": "ok"}   | Excepteur Cillum Ullamco Ipsum Eiusmod Nisi Et Fugiat Exercitation Laboris Anim Dolore Sunt Commodo Aute Consequat. Officia Incididunt Pariatur. Mollit Qui Magna Id Reprehenderit Quis Sed Sint Eu Irure Culpa Laborum Occaecat Proident, Duis Adipiscing Labo | 2025-01-28 00:00:00
-  2 | user_2   | user_2@mail.ru  |  19 |  11.59 | f         | {"score": 5.51, "status": "fail"} | Cillum Ullamco Non Cupidatat Occaecat Excepteur Incididunt Deserunt Sunt Commodo Anim Nulla Laborum Et Enim Consectetur Sed Ipsum Mollit Exercitation Voluptate Adipiscing Elit, Nostrud Esse Lorem Amet, Reprehenderit Ut Minim Magna Est Consequat. Tempor Ni | 2024-12-31 00:00:00
-  3 | user_3   | user_3@mail.ru  |  58 |  67.99 | t         | {"score": 2.15, "status": "ok"}   | Eiusmod Ut Reprehenderit Ipsum Laboris Cupidatat In Minim Pariatur. Ea Dolor Esse Excepteur Occaecat Sint Aliqua. Quis Proident, Sed Commodo Est Incididunt Aliquip Ex Eu Labore Magna Consequat. Officia Anim Ad Nisi Veniam, Sunt Duis Nostrud Culpa Lorem Ad | 2025-06-26 00:00:00
-  4 | user_4   | user_4@mail.ru  |  59 |  47.35 | t         | {"score": 5.28, "status": "ok"}   | Ut Est Commodo Ex Fugiat Adipiscing Velit Aliquip Duis Deserunt Ipsum Dolore Nulla Ea Non Lorem Qui Et Nisi Ad Ut Eiusmod Anim Sit Incididunt Enim Consectetur Minim Sint Ullamco Sed Aute Magna In Do Labore Quis Proident, Pariatur. Tempor Esse Occaecat Sun | 2025-01-30 00:00:00
-  5 | user_5   | user_5@mail.ru  |  33 |  54.73 | t         | {"score": 0.26, "status": "ok"}   | Ipsum Ut In Ex Laborum Velit Qui Mollit Irure Commodo Ad Magna Excepteur Reprehenderit Minim Deserunt Enim Esse Ea Incididunt Fugiat Aliqua. Sed Ullamco Do Ut Occaecat Officia Quis Sit Nisi Consequat. Exercitation Nulla Tempor Elit, Labore Est Eu Dolor Co | 2025-03-18 00:00:00
-  6 | user_6   | user_6@mail.ru  |  47 |  17.84 | t         | {"score": 8.36, "status": "ok"}   | Velit Fugiat Esse Ut Ea In Aliqua. Qui Ullamco Dolore Commodo Aute Eu Sint Aliquip Consequat. Ad Mollit Proident, Elit, Cupidatat Pariatur. Eiusmod Irure Culpa Do Adipiscing Tempor Non Est Nostrud Incididunt Et Consectetur Ex Id Veniam, Voluptate Magna La | 2024-11-04 00:00:00
-  7 | user_7   | user_7@mail.ru  |  33 |   2.26 | t         | {"score": 5.20, "status": "fail"} | Nulla Ea Consectetur Et Eu Ut Velit Sunt Lorem In Nisi Voluptate Nostrud Pariatur. Reprehenderit Qui Cillum Incididunt Occaecat Labore Do Ut Laborum Eiusmod Ipsum Ex Fugiat Sed Esse Consequat. Magna Id Est Enim Excepteur Ad Non Sit Adipiscing Veniam, Exer | 2024-05-21 00:00:00
-  8 | user_8   | user_8@mail.ru  |  27 |  77.49 | t         | {"score": 2.50, "status": "fail"} | Ipsum Voluptate Incididunt Proident, Eiusmod Dolor Magna Reprehenderit Deserunt Enim Tempor Consectetur Et Sed Do Est Consequat. Labore Lorem Excepteur Aliqua. Elit, Occaecat Ad Irure Culpa Amet, Dolore Aliquip Aute Eu Velit Sit Pariatur. Ut Exercitation  | 2024-01-10 00:00:00
-  9 | user_9   | user_9@mail.ru  |  38 |  17.99 | t         | {"score": 6.32, "status": "fail"} | Ad Eiusmod Labore Mollit Nostrud Sunt Pariatur. Proident, Excepteur Amet, In Consequat. Non Ex Ea Nulla Laborum Sit Aute Eu Voluptate Dolor Aliqua. Adipiscing Deserunt Ipsum Qui Ut Culpa Dolore Magna Consectetur Cupidatat Aliquip Laboris Incididunt Enim D | 2024-09-08 00:00:00
- 10 | user_10  | user_10@mail.ru |  31 |  83.61 | f         | {"score": 7.52, "status": "fail"} | Id Consequat. Do Exercitation Velit Culpa Sunt Anim Quis Ipsum Magna Aliquip Occaecat Mollit Reprehenderit Irure Ex Officia Sint Nostrud Laboris Est Laborum Nisi Dolore Proident, Excepteur In Cupidatat Aute Qui Labore Lorem Et Eiusmod Nulla Pariatur. Sit  | 2024-03-06 00:00:00
+ id | username |     email      | age | rating | is_active |               meta                |                                                                                                                              about                                                                                                                              |     created_at      
+----+----------+----------------+-----+--------+-----------+-----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------
+  1 | user1    | user1@mail.ru  |  22 |  56.94 | t         | {"score": 5.91, "status": "fail"} | Quis Duis Labore Eiusmod Eu Nulla Consectetur Occaecat Nisi Aliqua. Cupidatat Reprehenderit Do Esse Sit Et Fugiat Voluptate Est Irure Culpa Minim Ex Aute In Ut Excepteur Dolore Dolor Deserunt Enim Ipsum Officia Magna Ad Anim Incididunt Proident, Tempor Su | 2024-10-20 00:00:00
+  2 | user2    | user2@mail.ru  |  36 |  50.30 | t         | {"score": 2.81, "status": "ok"}   | Aute Incididunt Deserunt Ad Eiusmod Culpa Velit Ipsum Ut Elit, Mollit Sint Sed Laboris Cillum Ullamco Consequat. Anim Lorem Enim Occaecat Magna Est Id Pariatur. Esse Dolore In Consectetur Nisi Nulla Ea Ut Proident, Sunt Veniam, Aliquip Minim Qui Quis Volu | 2024-10-05 00:00:00
+  3 | user3    | user3@mail.ru  |  54 |  26.53 | f         | {"score": 7.80, "status": "fail"} | Nulla Officia Ipsum Consequat. Occaecat Fugiat Pariatur. Labore Laboris Lorem Sed Anim Tempor Incididunt Cupidatat Ut Do Sit Et Veniam, Excepteur Ea Minim Nostrud Quis Magna Duis In Elit, Ex Commodo Consectetur Nisi Eiusmod Exercitation Ut Deserunt Aliqui | 2025-05-07 00:00:00
+  4 | user4    | user4@mail.ru  |  44 |  57.60 | t         | {"score": 2.14, "status": "ok"}   | Sint Excepteur Et Cupidatat Pariatur. Mollit Adipiscing Ea Voluptate Amet, Minim Id Aliquip Nulla Aliqua. Quis Ipsum Eiusmod Ad Do Irure Duis Proident, Cillum Tempor Labore Sit Est Ex Fugiat Eu Laborum Sunt Magna Dolore Veniam, Enim Lorem Consectetur Comm | 2024-01-20 00:00:00
+  5 | user5    | user5@mail.ru  |  44 |  37.55 | t         | {"score": 3.12, "status": "fail"} | Anim Mollit Quis Aute Sint Sed Esse Ut Voluptate Aliquip Consequat. Veniam, Lorem Proident, Minim Dolore Nostrud Dolor Aliqua. Exercitation Velit Elit, Pariatur. Officia Nulla Labore Ex Incididunt Reprehenderit Est Et Adipiscing Laborum Commodo Eu Non Id  | 2025-03-22 00:00:00
+  6 | user6    | user6@mail.ru  |  26 |  42.73 | t         | {"score": 1.18, "status": "ok"}   | Pariatur. Culpa Esse Duis Nulla Proident, Ea Eu Et Tempor Aliqua. Amet, Reprehenderit Occaecat Laborum Quis Ad Ut Lorem Consequat. Mollit Irure Magna Non Voluptate Sunt Dolor Ut Cillum Nostrud Aliquip Consectetur In Est Laboris Deserunt Nisi Do Aute Enim  | 2025-05-01 00:00:00
+  7 | user7    | user7@mail.ru  |  25 |  22.96 | t         | {"score": 9.03, "status": "ok"}   | Pariatur. Fugiat Dolore Eu Est Aliqua. Officia Cupidatat Cillum Adipiscing Et Velit Qui Lorem Ullamco Sunt Id Deserunt Labore Duis Nostrud Aute Quis In Ad Sint Mollit Commodo Voluptate Ipsum Aliquip Ut Do Culpa Incididunt Esse Occaecat Non Anim Tempor Eiu | 2024-09-05 00:00:00
+  8 | user8    | user8@mail.ru  |  20 |  69.09 | t         | {"score": 5.92, "status": "fail"} | Amet, In Dolor Id Consectetur Et Quis Cupidatat Officia Incididunt Est Ex Anim Tempor Fugiat Nulla Pariatur. Aute Sit Non Cillum Qui Adipiscing Aliqua. Nisi Commodo Occaecat Sed Proident, Esse Ullamco Consequat. Duis Sint Ut Culpa Dolore Magna Voluptate E | 2025-03-24 00:00:00
+  9 | user9    | user9@mail.ru  |  24 |  18.34 | f         | {"score": 6.50, "status": "ok"}   | Cillum Officia Ut Veniam, Ut Esse Voluptate Magna Dolor Et Minim Ad Laboris Nisi In Id Reprehenderit Aliquip Tempor Mollit Enim Ipsum Non Velit Irure Culpa Elit, Ex Consequat. Occaecat Quis Duis Do Consectetur Ullamco Sed Aliqua. Qui Pariatur. Est Exercit | 2024-04-17 00:00:00
+ 10 | user10   | user10@mail.ru |  63 |   0.57 | t         | {"score": 3.54, "status": "ok"}   | Fugiat Consectetur Sed Exercitation Non Et Elit, Ea Ex Quis Velit Esse Laboris Sunt Amet, Mollit Eu Tempor Nisi Sint Minim Ut Duis Eiusmod Incididunt Ullamco Veniam, Aute Anim Deserunt Est Proident, Sit Voluptate In Magna Dolore Ad Occaecat Dolor Lorem Co | 2024-02-18 00:00:00
 (10 rows)
 ```
+
+## Размеры полученной БД и индексов
+
+Далее по ходу выполнения ДЗ я буду замерять размеры полученных индексов, чтобы оценивать дополнительные затраты на ресурсы, так как
+индексы не бесплатные. Измерения проводятся с помощью запроса ниже.
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating'));
+
+ pg_size_pretty 
+----------------
+ 567 MB
+```
+
+# Решение домашнего задания
+
+## Простые индексы
+
+Для ряда полей создадим простые индексы, которые ускорят поиск по типовым бизнес-кейсам
+
+### Поиск пользователя по username
+
+Предположим, что в нашей системе есть интерфейс, где можно найти пользователя по его username. Запрос с интерфейса выглядит следующим
+образом:
+
+```sql
+EXPLAIN
+SELECT username, email FROM users
+	WHERE username = 'user_777';
+```
+
+Поиск с предикатом `=` выполняется быстро, так как индекс уже существует для работы `UNIQUE`.
+
+```
+ Index Scan using users_username_key on users  (cost=0.43..2.65 rows=1 width=32)
+   Index Cond: ((username)::text = 'user_777'::text)
+```
+
+Однако, с точки зрения пользователя интерфейсом нас интересует поиск по подстроке, а текущий индекс не позволяет искать по предикату
+`LIKE`. Поэтому запрос ниже не использует индекс, а выполняет сканирование по всем данным.
+
+```sql
+EXPLAIN
+SELECT username, email FROM users
+	WHERE username LIKE '%user777%';
+```
+
+```
+ Gather  (cost=1000.00..55980.33 rows=100 width=28)
+   Workers Planned: 2
+   ->  Parallel Seq Scan on users  (cost=0.00..54970.33 rows=42 width=28)
+         Filter: ((username)::text ~~ '%user777%'::text
+```
+
+Чтобы ускорить запросы добавляем GIN-индекс на поле и смотрим план предыдущего запроса.
+
+```sql
+-- Расширение позволяющее добавлять GIN-индекс на varchar поля
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_users_username
+	ON public.users USING gin 
+	(username gin_trgm_ops);
+```
+
+```
+ Bitmap Heap Scan on users  (cost=28.40..139.20 rows=100 width=28)
+   Recheck Cond: ((username)::text ~~ 'user777%'::text)
+   ->  Bitmap Index Scan on idx_users_username  (cost=0.00..28.38 rows=100 width=0)
+         Index Cond: ((username)::text ~~ 'user777%'::text)
+```
+
+Таким образом затраты на поиск с предикатом `LIKE` сократились с 55980 до 139 условных единиц.
+
+**Размер индекса:**
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_username'));
+
+ pg_size_pretty 
+----------------
+ 19 MB
+```
+
+### Поиск пользователей по рейтингу
+
+Еще один бизнес-кейс — поиск пользователей с рейтингом более 90 единиц. Время выполнения которого без индексов составляет ~200мс.
+
+```sql
+EXPLAIN ANALYZE
+SELECT id, username, email, rating
+FROM users
+WHERE rating >= 90.0;
+```
+
+```
+ Seq Scan on users  (cost=0.00..62262.00 rows=101055 width=38) (actual time=0.036..203.760 rows=99409 loops=1)
+   Filter: (rating >= 90.0)
+   Rows Removed by Filter: 90059
+```
+
+Добавляем простой B-Tree индекс и видим, что время выполнения сократилось до ~65мс.
+
+```sql
+CREATE INDEX idx_users_rating
+    ON users USING btree
+    (rating);
+```
+
+```
+ Bitmap Heap Scan on users  (cost=1089.40..52114.59 rows=101055 width=38) (actual time=30.942..68.496 rows=99409 loops=1)
+   Recheck Cond: (rating >= 90.0)
+   Heap Blocks: exact=43553
+   ->  Bitmap Index Scan on idx_users_rating  (cost=0.00..1064.14 rows=101055 width=0) (actual time=24.802..24.802 rows=99409 loops=1)
+         Index Cond: (rating >= 90.0)
+```
+
+**Размер индекса:**
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating'));
+
+ pg_size_pretty 
+----------------
+ 21 MB
+```
+
+### Поиск пользователей по рейтингу (оптимизация №1)
+
+Однако как видно из плана запроса выше — время на поиск по индексу составляет ~24мс, в то время как остальное время занимает получение
+атрибутов запрос из данных. Так как получение пользователей с высоким рейтингом является частой операцией, то мы можем ускорить ее
+работу путем добавления требуемых данных в индекс, что позволит не обращаться за ними в таблицу и значительно ускорить запрос.
+
+```sql
+CREATE INDEX idx_users_rating_with_data
+    ON users USING btree
+    (rating)
+    INCLUDE(id, username, email);
+```
+
+```sql
+ Index Only Scan using idx_users_rating_with_data on users  (cost=0.42..2676.39 rows=101055 width=38) (actual time=0.049..20.754 rows=99409 loops=1)
+   Index Cond: (rating >= 90.0)
+   Heap Fetches: 0
+```
+
+Но, как можно увидеть ниже, платой за ускорение запроса стали размеры индексов.
+
+**Размер индекса:**
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating_with_data'));
+
+ pg_size_pretty 
+----------------
+ 64 MB
+```
+
+### Поиск пользователей по рейтингу (оптимизация №1)
+
+Попробуем оптимизировать индекс выше, чтобы он не занимал 11% всех данных в таблице users. Так как в нашем запросе мы ищем пользователей
+с рейтингом только 90 и выше, то почему бы не создать частичный индекс только на эти данные?
+
+```sql
+DROP INDEX idx_users_rating_with_data;
+
+CREATE INDEX idx_users_rating_with_data
+    ON users USING btree
+    (rating)
+	INCLUDE(id, username, email)
+	WHERE rating >= 90.0;
+```
+
+Проверяем, что производительность поиска не упала
+
+```sql
+EXPLAIN ANALYZE
+SELECT id, username, email, rating
+FROM users
+WHERE rating >= 90.0;
+```
+
+```
+ Index Only Scan using idx_users_rating_with_data on users  (cost=0.42..2402.31 rows=101055 width=38) (actual time=0.030..18.464 rows=99409 loops=1)
+   Heap Fetches: 0
+```
+
+А размер индекса существенно сократился:
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating_with_data'));
+
+ pg_size_pretty 
+----------------
+ 6504 kB
+```
+
+Да! Всего одной строчкой мы сократили размер текущего индекс в 10 раз!
+
