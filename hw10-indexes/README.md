@@ -120,11 +120,9 @@ SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating'));
 
 # Решение домашнего задания
 
-## Простые индексы
+Придумаем бизнес кейсы и попробуем добиться максимальной производительности поиска для них.
 
-Для ряда полей создадим простые индексы, которые ускорят поиск по типовым бизнес-кейсам
-
-### Поиск пользователя по username
+## Поиск пользователя по username
 
 Предположим, что в нашей системе есть интерфейс, где можно найти пользователя по его username. Запрос с интерфейса выглядит следующим
 образом:
@@ -188,7 +186,7 @@ SELECT pg_size_pretty(pg_total_relation_size('idx_users_username'));
  19 MB
 ```
 
-### Поиск пользователей по рейтингу
+## Поиск пользователей по рейтингу
 
 Еще один бизнес-кейс — поиск пользователей с рейтингом более 90 единиц. Время выполнения которого без индексов составляет ~200мс.
 
@@ -231,7 +229,7 @@ SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating'));
  21 MB
 ```
 
-### Поиск пользователей по рейтингу (оптимизация №1)
+### Оптимизация №1
 
 Однако как видно из плана запроса выше — время на поиск по индексу составляет ~24мс, в то время как остальное время занимает получение
 атрибутов запрос из данных. Так как получение пользователей с высоким рейтингом является частой операцией, то мы можем ускорить ее
@@ -262,10 +260,10 @@ SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating_with_data'));
  64 MB
 ```
 
-### Поиск пользователей по рейтингу (оптимизация №1)
+### Оптимизация №2
 
 Попробуем оптимизировать индекс выше, чтобы он не занимал 11% всех данных в таблице users. Так как в нашем запросе мы ищем пользователей
-с рейтингом только 90 и выше, то почему бы не создать частичный индекс только на эти данные?
+с рейтингом только 90 и выше, то почему бы не создать **частичный индекс** только на эти данные?
 
 ```sql
 DROP INDEX idx_users_rating_with_data;
@@ -303,3 +301,184 @@ SELECT pg_size_pretty(pg_total_relation_size('idx_users_rating_with_data'));
 
 Да! Всего одной строчкой мы сократили размер текущего индекс в 10 раз!
 
+## Поиск чемпионов геймификации
+
+В атрибуте `meta` хранится дополнительная информация о пользователе, такая как `score` и `status`, которые пользователь получает во 
+время участия в геймификации на сервисе. Давайте найдем пользователей, которые имеют самый высоких бал и посмотрим план запроса.
+
+```
+SELECT id, username, meta
+FROM users
+WHERE is_active = true
+	AND (meta->>'score')::numeric = 9.7
+	AND meta->>'status' = 'ok';
+```
+
+```
+ Gather  (cost=1000.00..61311.97 rows=1333 width=59) (actual time=0.338..105.217 rows=12320 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on users  (cost=0.00..60178.67 rows=555 width=59) (actual time=0.043..98.353 rows=4107 loops=3)
+         Filter: (is_active AND ((meta ->> 'status'::text) = 'ok'::text) AND (((meta ->> 'score'::text))::numeric >= 9.7))
+         Rows Removed by Filter: 329227
+```
+
+### Оптимизация №1
+
+Достаточно неплохой результат в 105 мс. Но давайте ускорим его с помощью индексов. Для начала попробуем создать индексы для атрибутов 
+`is_active` и `meta` по отдельности.
+
+```sql
+CREATE INDEX idx_users_is_active
+    ON users USING btree
+    (is_active);
+
+CREATE INDEX idx_users_meta
+    ON users USING gin
+    (meta);
+    
+ANALYZE users;
+```
+
+```sql
+EXPLAIN ANALYZE
+SELECT id, username, meta
+FROM users
+WHERE is_active = true
+	AND (meta->>'score')::numeric >= 9.7
+	AND meta->>'status' = 'ok';
+```
+
+```
+ Gather  (cost=1000.00..61311.13 rows=1324 width=59) (actual time=0.792..111.230 rows=12320 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on users  (cost=0.00..60178.73 rows=552 width=59) (actual time=0.096..103.714 rows=4107 loops=3)
+         Filter: (is_active AND ((meta ->> 'status'::text) = 'ok'::text) AND (((meta ->> 'score'::text))::numeric >= 9.7))
+         Rows Removed by Filter: 329227
+```
+
+### Оптимизация №2
+
+Как видим планировщик решил их не использовать и посчитал, что быстрее будет выполнить обычный перебор всех записей. Удаляем индексы и 
+пишем **составной индекс**.
+
+```sql
+DROP INDEX idx_users_is_active;
+DROP INDEX idx_users_meta;
+```
+
+```sql
+CREATE INDEX idx_users_is_active_and_meta
+    ON users 
+    (is_active, meta);
+
+ANALYZE users;
+```
+
+Увы, но и это не помогло...
+
+```
+ Gather  (cost=1000.00..61311.67 rows=1330 width=59) (actual time=0.490..110.084 rows=12320 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on users  (cost=0.00..60178.67 rows=554 width=59) (actual time=0.074..102.329 rows=4107 loops=3)
+         Filter: (is_active AND ((meta ->> 'status'::text) = 'ok'::text) AND (((meta ->> 'score'::text))::numeric >= 9.7))
+         Rows Removed by Filter: 329227
+```
+
+### Оптимизация №3
+
+Вспомним про **частичные индексы** и сделаем комбинацию из составного и частичного индекса. Но сначала давайте подробнее изучим, на 
+основе каких данных планировщик будет решать, нужно ли использовать индекс для атрибута `is_active`.
+
+```sql
+SELECT
+	most_common_vals AS mcv,
+	left(most_common_freqs::text, 60) || '...' AS mcf
+	FROM pg_stats
+	WHERE tablename = 'users'
+		AND attname = 'is_active' \gx
+```
+
+```
+-[ RECORD 1 ]-------------------
+mcv | {t,f}
+mcf | {0.79906666,0.20093334}..
+```
+
+Как можно увидеть значение `is_active = true` порядка 80%, поэтому планировщику не имеет смысла использовать индекс при поиске, так как 
+накладных расходов на работу с индексом будет больше, чем затрат на фильтрацию значения `false` в процессе перебора всех данных. Из 
+этого мы делаем вывод, что создавать индекс на атрибут `is_active` для данного случая не требуется.
+
+Создаем новый индекс и оцениваем результат.
+
+```sql
+CREATE INDEX idx_users_is_active_and_meta_top_score
+    ON users 
+    (is_active, meta)
+	WHERE (meta->>'score')::numeric >= 9.7 AND meta->>'status' = 'ok';
+
+ANALYZE users;
+```
+
+```sql
+EXPLAIN ANALYZE
+SELECT id, username, meta
+FROM users
+WHERE is_active = true
+	AND (meta->>'score')::numeric >= 9.7
+	AND meta->>'status' = 'ok';
+```
+
+```
+ Index Scan using idx_users_is_active_and_meta_top_score on users  (cost=0.41..1124.79 rows=1330 width=59) (actual time=0.020..21.378 rows=12320 loops=1)
+   Index Cond: (is_active = true)
+```
+
+Неплохо, мы сократили запрос в 5 раз! Обратите внимание, что сам индекс занимает незначительный объем на диске. 
+
+**Размер индекса:**
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_is_active_and_meta_top_score'));
+
+ pg_size_pretty 
+----------------
+ 1312 kB
+```
+
+### Оптимизация №4
+
+Вспоминаем наш предыдущий опыт и то, что после получения записей из индекса планировщик обращается на диск для извлечения самих данных. 
+Оптимизируем наш предыдущий индекс, добавив нужные данные в него, и посмотрим на результат.
+
+```sql
+DROP INDEX idx_users_is_active_and_meta_top_score;
+
+CREATE INDEX idx_users_is_active_and_meta_top_score
+    ON users 
+    (is_active, meta)
+	INCLUDE(id, username)
+	WHERE (meta->>'score')::numeric >= 9.7 AND meta->>'status' = 'ok';
+
+ANALYZE users;
+```
+
+```
+ Index Only Scan using idx_users_is_active_and_meta_top_score on users  (cost=0.41..40.24 rows=1333 width=59) (actual time=0.178..4.665 rows=12320 loops=1)
+   Index Cond: (is_active = true)
+   Heap Fetches: 0
+```
+
+В 20 раз быстрее относительного первого запроса! А что с размером?
+
+**Размер индекса:**
+
+```sql
+SELECT pg_size_pretty(pg_total_relation_size('idx_users_is_active_and_meta_top_score'));
+
+ pg_size_pretty 
+----------------
+ 1312 kB
+```
