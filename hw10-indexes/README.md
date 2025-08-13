@@ -165,6 +165,8 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX idx_users_username
 	ON public.users USING gin 
 	(username gin_trgm_ops);
+
+ANALYZE users;
 ```
 
 ```
@@ -209,6 +211,8 @@ WHERE rating >= 90.0;
 CREATE INDEX idx_users_rating
     ON users USING btree
     (rating);
+
+ANALYZE users;
 ```
 
 ```
@@ -240,6 +244,8 @@ CREATE INDEX idx_users_rating_with_data
     ON users USING btree
     (rating)
     INCLUDE(id, username, email);
+
+ANALYZE users;
 ```
 
 ```sql
@@ -273,6 +279,8 @@ CREATE INDEX idx_users_rating_with_data
     (rating)
 	INCLUDE(id, username, email)
 	WHERE rating >= 90.0;
+	
+ANALYZE users;
 ```
 
 Проверяем, что производительность поиска не упала
