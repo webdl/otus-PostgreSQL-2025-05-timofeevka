@@ -1,3 +1,5 @@
+[TOC]
+
 # Секционирование таблицы
 
 Цели:
@@ -312,10 +314,10 @@ ORDER BY year;
 Из представленного анализа видно, что выбранные таблицы являются самыми большими и высоко нагруженными, поэтому проведем секционирование
 каждой из них, при этом:
 
-1. `ticket_flights` секционируем с помощью `LIST` по полю `fare_conditions`, чисто для эксперимента
-2. `boarding_passes` секционируем с помощью простого `RANGE`, так как ключ секционирования это число
-3. `bookings` секционируем с помощью `RANGE`, так как ключ секционирования это дата
-4. `tickets` секционируем с помощью `HASH`, так как ключ секционирования это строка
+1. `bookings` секционируем с помощью `RANGE`, так как ключ секционирования это дата
+2. `tickets` секционируем с помощью `HASH`, так как ключ секционирования это строка
+3. `ticket_flights` секционируем с помощью `LIST` по полю `fare_conditions`, чисто для эксперимента
+4. `boarding_passes` секционируем с помощью простого `RANGE`, так как ключ секционирования это число
 
 Секционирование будем проводить в другой схеме, поэтому создадим ее предварительно для всех таблиц.
 
@@ -499,11 +501,7 @@ CREATE TABLE IF NOT EXISTS bookings_copy.boarding_passes
 		ON UPDATE NO ACTION
         ON DELETE NO ACTION
 ) PARTITION BY RANGE (flight_id);
-```
 
-Создаем секции.
-
-```sql
 CREATE TABLE bookings_copy.boarding_passes_0 PARTITION OF bookings_copy.boarding_passes
 	FOR VALUES FROM (0) TO (100000);
 CREATE TABLE bookings_copy.boarding_passes_1 PARTITION OF bookings_copy.boarding_passes
@@ -512,11 +510,7 @@ CREATE TABLE bookings_copy.boarding_passes_2 PARTITION OF bookings_copy.boarding
 	FOR VALUES FROM (200000) TO (300000);
 CREATE TABLE bookings_copy.boarding_passes_3 PARTITION OF bookings_copy.boarding_passes
 	FOR VALUES FROM (300000) TO (400000);
-```
 
-Наполняем данными и собираем статистику.
-
-```sql
  -- 1min 12sec
 INSERT INTO bookings_copy.boarding_passes
 	OVERRIDING SYSTEM VALUE
@@ -524,3 +518,4 @@ INSERT INTO bookings_copy.boarding_passes
 
 VACUUM ANALYZE bookings_copy.boarding_passes;
 ```
+
