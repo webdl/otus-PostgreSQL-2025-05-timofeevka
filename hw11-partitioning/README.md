@@ -856,3 +856,7 @@ EXPLAIN ANALYZE SELECT * FROM bookings_copy.ticket_flights WHERE fare_conditions
  Execution Time: 129.129 ms
 */
 ```
+
+### Таблица boarding_passes
+
+Ведет себя по аналогии с другими секционированными по диапазону первичных ключей таблицами, поэтому публиковать ее замеры не требуется.
