@@ -368,7 +368,7 @@ VACUUM ANALYZE bookings_copy.bookings;
 * Внешний ключ надо сделать по полю `book_ref`, которого в ключе секционирования `bookings` нет, а в `tickets` нет поля с ключом
   секционирования `book_date`.
 
-Из-за этого прямой внешний ключ поставить нельзя — это архитектурное ограничение PostgreSQL. Поэтому создаем секционированную таблицу 
+Из-за этого прямой внешний ключ поставить нельзя — это архитектурное ограничение PostgreSQL. Поэтому создаем секционированную таблицу
 без внешнего ключа и наполняем данными.
 
 ```sql
@@ -437,7 +437,7 @@ VACUUM ANALYZE bookings_copy.tickets;
 
 #### ЧТО ДЕЛАТЬ?!
 
-Ничего. В жизни мы бы использовали либо секционирование для `bookings` по первичному ключу, либо пошли по **Варианту 1**. А в случае с 
+Ничего. В жизни мы бы использовали либо секционирование для `bookings` по первичному ключу, либо пошли по **Варианту 1**. А в случае с
 домашним заданием нам:
 
 1. интересно провести секционирование по дате
@@ -517,5 +517,130 @@ INSERT INTO bookings_copy.boarding_passes
 	SELECT * FROM bookings.boarding_passes;
 
 VACUUM ANALYZE bookings_copy.boarding_passes;
+```
+
+## Сравнение результатов
+
+### Таблица bookings
+
+#### Полная выборка
+
+Секционирование не дает преимущества при полной выборке так как приходится обходить каждую секцию.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.bookings;
+/*
+ Seq Scan on bookings  (cost=0.00..34599.10 rows=2111110 width=21) (actual time=0.025..89.084 rows=2111110 loops=1)
+ Planning Time: 0.100 ms
+ Execution Time: 136.449 ms
+*/
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings;
+/*
+ Append  (cost=0.00..45113.65 rows=2111110 width=21) (actual time=0.020..162.218 rows=2111110 loops=1)
+   ->  Seq Scan on bookings_2016 bookings_1  (cost=0.00..13962.35 rows=852935 width=21) (actual time=0.020..45.309 rows=852935 loops=1)
+   ->  Seq Scan on bookings_2017 bookings_2  (cost=0.00..20595.75 rows=1258175 width=21) (actual time=0.005..37.936 rows=1258175 loops=1)
+ Planning Time: 0.128 ms
+ Execution Time: 203.253 ms
+*/
+```
+
+#### Выборка по ключу
+
+Секционирование не дает преимущества при выборке по ключу, так как требуется обход индексов в каждой секции.
+
+```sql
+EXPLAIN SELECT * FROM bookings.bookings WHERE book_ref = '000004';
+/*
+ Index Scan using bookings_pkey on bookings  (cost=0.43..2.65 rows=1 width=21) (actual time=0.461..0.465 rows=1 loops=1)
+ Planning Time: 0.140 ms
+ Execution Time: 0.501 m
+*/
+
+EXPLAIN SELECT * FROM bookings_copy.bookings WHERE book_ref = '000004';
+/*
+ Append  (cost=0.42..5.30 rows=2 width=21) (actual time=0.182..0.737 rows=1 loops=1)
+   ->  Index Scan using bookings_2016_pkey on bookings_2016 bookings_1  (cost=0.42..2.64 rows=1 width=21) (actual time=0.181..0.183 
+rows=1 loops=1)
+   ->  Index Scan using bookings_2017_pkey on bookings_2017 bookings_2  (cost=0.43..2.65 rows=1 width=21) (actual time=0.547..0.547 
+rows=0 loops=1)
+ Planning Time: 0.232 ms
+ Execution Time: 0.792 ms
+*/
+```
+
+#### Выборка по дате
+
+Секционирование дает небольшое преимущество при выборке по дате, так как происходит сканирование одной секции с меньшим числом строк 
+данных. Однако если 
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date = '2016-08-13';
+/*
+ Gather  (cost=1000.00..25483.86 rows=5 width=21) (actual time=34.728..53.054 rows=3 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on bookings  (cost=0.00..24483.36 rows=2 width=21) (actual time=31.036..46.696 rows=1 loops=3)
+         Filter: (book_date = '2016-08-13 00:00:00+00'::timestamp with time zone)
+         Rows Removed by Filter: 703702
+ Planning Time: 0.101 ms
+ Execution Time: 53.079 ms
+*/
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings WHERE book_date = '2016-08-13';
+/*
+ Index Scan using bookings_2016_pkey on bookings_2016 bookings  (cost=0.42..10010.71 rows=5 width=21) (actual time=12.740..35.954 
+rows=3 loops=1)
+   Index Cond: (book_date = '2016-08-13 00:00:00+00'::timestamp with time zone)
+ Planning Time: 0.204 ms
+ Execution Time: 36.002 ms
+*/
+```
+
+Однако это преимущество теряется при создании индексов на исходной таблице.
+
+```sql
+CREATE INDEX ON bookings.bookings (book_date);
+ANALYZE bookings.bookings;
+EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date = '2016-08-13';
+/*
+ Index Scan using bookings_book_date_idx on bookings  (cost=0.43..7.12 rows=5 width=21) (actual time=0.028..0.035 rows=3 loops=1)
+   Index Cond: (book_date = '2016-08-13 00:00:00+00'::timestamp with time zone)
+ Planning Time: 0.076 ms
+ Execution Time: 0.051 ms
+*/
+
+CREATE INDEX ON bookings_copy.bookings (book_date);
+ANALYZE bookings_copy.bookings;
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings WHERE book_date = '2016-08-13';
+/*
+ Index Scan using bookings_2016_book_date_idx on bookings_2016 bookings  (cost=0.42..7.11 rows=5 width=21) (actual time=0.047..0.059 rows=3 loops=1)
+   Index Cond: (book_date = '2016-08-13 00:00:00+00'::timestamp with time zone)
+ Planning Time: 0.664 ms
+ Execution Time: 0.086 ms
+*/
+```
+
+#### Выборка по диапазону дат
+
+И только при выборке по диапазону дат мы видим существенное повышение скорости выполнения запроса.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date > '2016-08-13' AND book_date < '2017-01-01';
+/*
+ Index Scan using bookings_book_date_idx1 on bookings  (cost=0.43..31908.75 rows=784167 width=21) (actual time=0.017..283.488 rows=777983 loops=1)
+   Index Cond: ((book_date > '2016-08-13 00:00:00+00'::timestamp with time zone) AND (book_date < '2017-01-01 00:00:00+00'::timestamp with time zone))
+ Planning Time: 0.049 ms
+ Execution Time: 296.656 ms
+*/
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings WHERE book_date > '2016-08-13' AND book_date < '2017-01-01';
+/*
+ Seq Scan on bookings_2016 bookings  (cost=0.00..18227.03 rows=778765 width=21) (actual time=0.005..37.297 rows=777983 loops=1)
+   Filter: ((book_date > '2016-08-13 00:00:00+00'::timestamp with time zone) AND (book_date < '2017-01-01 00:00:00+00'::timestamp with time zone))
+   Rows Removed by Filter: 74952
+ Planning Time: 0.136 ms
+ Execution Time: 51.432 ms
+*/
 ```
 
