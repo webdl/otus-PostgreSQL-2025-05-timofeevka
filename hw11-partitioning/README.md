@@ -572,7 +572,7 @@ rows=0 loops=1)
 #### Выборка по дате
 
 Секционирование дает небольшое преимущество при выборке по дате, так как происходит сканирование одной секции с меньшим числом строк 
-данных. Однако если 
+данных.
 
 ```sql
 EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date = '2016-08-13';
@@ -602,6 +602,7 @@ rows=3 loops=1)
 ```sql
 CREATE INDEX ON bookings.bookings (book_date);
 ANALYZE bookings.bookings;
+
 EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date = '2016-08-13';
 /*
  Index Scan using bookings_book_date_idx on bookings  (cost=0.43..7.12 rows=5 width=21) (actual time=0.028..0.035 rows=3 loops=1)
@@ -612,6 +613,7 @@ EXPLAIN ANALYZE SELECT * FROM bookings.bookings WHERE book_date = '2016-08-13';
 
 CREATE INDEX ON bookings_copy.bookings (book_date);
 ANALYZE bookings_copy.bookings;
+
 EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings WHERE book_date = '2016-08-13';
 /*
  Index Scan using bookings_2016_book_date_idx on bookings_2016 bookings  (cost=0.42..7.11 rows=5 width=21) (actual time=0.047..0.059 rows=3 loops=1)
@@ -644,3 +646,138 @@ EXPLAIN ANALYZE SELECT * FROM bookings_copy.bookings WHERE book_date > '2016-08-
 */
 ```
 
+### Таблица tickets
+
+#### Выборка по ключу
+
+Секционирование дает небольшое преимущество при выборке по ключу, так как происходит сканирование одной секции с меньшим числом строк 
+данных.
+
+```sql
+CREATE INDEX ON bookings.tickets (ticket_no);
+ANALYZE bookings.tickets;
+
+EXPLAIN ANALYZE SELECT * FROM bookings.tickets WHERE ticket_no = '0005432000308';
+/*
+ Index Scan using tickets_ticket_no_idx on tickets  (cost=0.43..2.65 rows=1 width=104) (actual time=0.077..0.079 rows=1 loops=1)
+   Index Cond: (ticket_no = '0005432000308'::bpchar)
+ Planning Time: 0.319 ms
+ Execution Time: 0.113 ms
+*/
+
+CREATE INDEX ON bookings_copy.tickets (ticket_no);
+ANALYZE bookings_copy.tickets;
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.tickets WHERE ticket_no = '0005432000308';
+/*
+ Index Scan using tickets_0_ticket_no_idx on tickets_0 tickets  (cost=0.42..2.64 rows=1 width=104) (actual time=0.057..0.059 rows=1 loops=1)
+   Index Cond: (ticket_no = '0005432000308'::bpchar)
+ Planning Time: 0.169 ms
+ Execution Time: 0.082 ms
+*/
+```
+
+#### Выборка по другому значению
+
+Примечательно, но оно быстрее или близко по скорости к большой таблице даже при отсутствии индексов.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.tickets WHERE passenger_id = '6107 738882';
+/*
+ Gather  (cost=1000.00..65801.91 rows=1 width=104) (actual time=0.448..99.465 rows=1 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on tickets  (cost=0.00..64801.81 rows=1 width=104) (actual time=57.475..88.887 rows=0 loops=3)
+         Filter: ((passenger_id)::text = '6107 738882'::text)
+         Rows Removed by Filter: 983285
+ Planning Time: 0.124 ms
+ Execution Time: 100.132 m
+*/
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.tickets WHERE passenger_id = '6107 738882';
+/*
+ Gather  (cost=1000.00..65783.89 rows=10 width=104) (actual time=85.141..87.885 rows=1 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Append  (cost=0.00..64782.89 rows=10 width=104) (actual time=73.246..78.480 rows=0 loops=3)
+         ->  Parallel Seq Scan on tickets_7 tickets_8  (cost=0.00..6498.49 rows=1 width=104) (actual time=40.017..40.017 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295774
+         ->  Parallel Seq Scan on tickets_8 tickets_9  (cost=0.00..6483.52 rows=1 width=104) (actual time=40.001..40.001 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295204
+         ->  Parallel Seq Scan on tickets_4 tickets_5  (cost=0.00..6483.33 rows=1 width=104) (actual time=18.596..18.596 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295359
+         ->  Parallel Seq Scan on tickets_3 tickets_4  (cost=0.00..6482.80 rows=1 width=104) (actual time=19.895..19.895 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295257
+         ->  Parallel Seq Scan on tickets_2 tickets_3  (cost=0.00..6481.99 rows=1 width=104) (actual time=15.611..15.611 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295103
+         ->  Parallel Seq Scan on tickets_0 tickets_1  (cost=0.00..6479.69 rows=1 width=104) (actual time=0.007..15.287 rows=1 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 295043
+         ->  Parallel Seq Scan on tickets_9 tickets_10  (cost=0.00..6478.73 rows=1 width=104) (actual time=4.436..4.436 rows=0 loops=3)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 98351
+         ->  Parallel Seq Scan on tickets_5 tickets_6  (cost=0.00..6469.42 rows=1 width=104) (actual time=14.950..14.950 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 294609
+         ->  Parallel Seq Scan on tickets_6 tickets_7  (cost=0.00..6463.41 rows=1 width=104) (actual time=19.002..19.002 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 294222
+         ->  Parallel Seq Scan on tickets_1 tickets_2  (cost=0.00..6461.46 rows=1 width=104) (actual time=38.750..38.750 rows=0 loops=1)
+               Filter: ((passenger_id)::text = '6107 738882'::text)
+               Rows Removed by Filter: 294233
+ Planning Time: 1.230 ms
+ Execution Time: 87.940 ms
+*/
+```
+
+#### Выборка по другому значению (с индексами)
+
+А при наличии индексов секционированная таблица потеряла в скорости даже относительно своих предыдущих параметров.
+
+```sql
+CREATE INDEX ON bookings.tickets (passenger_id);
+ANALYZE bookings.tickets;
+
+EXPLAIN ANALYZE SELECT * FROM bookings.tickets WHERE passenger_id = '6107 738882';
+/*
+ Index Scan using tickets_passenger_id_idx on tickets  (cost=0.43..2.65 rows=1 width=104) (actual time=0.060..0.062 rows=1 loops=1)
+   Index Cond: ((passenger_id)::text = '6107 738882'::text)
+ Planning Time: 0.142 ms
+ Execution Time: 0.088 ms
+*/
+
+CREATE INDEX ON bookings_copy.tickets (passenger_id);
+ANALYZE bookings_copy.tickets;
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.tickets WHERE passenger_id = '6107 738882';
+/*
+ Append  (cost=0.42..26.45 rows=10 width=104) (actual time=0.067..0.330 rows=1 loops=1)
+   ->  Index Scan using tickets_0_passenger_id_idx2 on tickets_0 tickets_1  (cost=0.42..2.64 rows=1 width=104) (actual time=0.066..0.075 rows=1 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_1_passenger_id_idx2 on tickets_1 tickets_2  (cost=0.42..2.64 rows=1 width=104) (actual time=0.017..0.017 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_2_passenger_id_idx2 on tickets_2 tickets_3  (cost=0.42..2.64 rows=1 width=104) (actual time=0.019..0.019 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_3_passenger_id_idx2 on tickets_3 tickets_4  (cost=0.42..2.64 rows=1 width=104) (actual time=0.060..0.060 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_4_passenger_id_idx2 on tickets_4 tickets_5  (cost=0.42..2.64 rows=1 width=104) (actual time=0.024..0.024 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_5_passenger_id_idx2 on tickets_5 tickets_6  (cost=0.42..2.64 rows=1 width=104) (actual time=0.020..0.020 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_6_passenger_id_idx2 on tickets_6 tickets_7  (cost=0.42..2.64 rows=1 width=104) (actual time=0.018..0.019 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_7_passenger_id_idx2 on tickets_7 tickets_8  (cost=0.42..2.64 rows=1 width=104) (actual time=0.018..0.019 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_8_passenger_id_idx2 on tickets_8 tickets_9  (cost=0.42..2.64 rows=1 width=104) (actual time=0.027..0.028 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+   ->  Index Scan using tickets_9_passenger_id_idx2 on tickets_9 tickets_10  (cost=0.42..2.64 rows=1 width=104) (actual time=0.044..0.044 rows=0 loops=1)
+         Index Cond: ((passenger_id)::text = '6107 738882'::text)
+ Planning Time: 1.011 ms
+ Execution Time: 0.416 ms
+*/
+```
