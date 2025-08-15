@@ -781,3 +781,78 @@ EXPLAIN ANALYZE SELECT * FROM bookings_copy.tickets WHERE passenger_id = '6107 7
  Execution Time: 0.416 ms
 */
 ```
+
+### Таблица ticket_flights
+
+#### Выборка по значению списка
+
+Поиск по самому маленькому значению списка на одной таблице существенно ускоряется при добавлении индексов.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.ticket_flights WHERE fare_conditions = 'Business';
+/*
+ Seq Scan on ticket_flights  (cost=0.00..174851.38 rows=848082 width=32) (actual time=4.975..294.972 rows=859656 loops=1)
+   Filter: ((fare_conditions)::text = 'Business'::text)
+   Rows Removed by Filter: 7532196
+ Planning Time: 0.128 ms
+ JIT:
+   Functions: 2
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 0.313 ms, Inlining 0.000 ms, Optimization 0.447 ms, Emission 4.497 ms, Total 5.257 ms
+ Execution Time: 312.739 ms
+*/
+
+
+CREATE INDEX ON bookings.ticket_flights (fare_conditions);
+ANALYZE bookings.ticket_flights;
+
+EXPLAIN ANALYZE SELECT * FROM bookings.ticket_flights WHERE fare_conditions = 'Business';
+/*
+ Index Scan using ticket_flights_fare_conditions_idx on ticket_flights  (cost=0.43..40016.90 rows=876388 width=32) (actual time=0.030..60.561 rows=859656 loops=1)
+   Index Cond: ((fare_conditions)::text = 'Business'::text)
+ Planning Time: 0.063 ms
+ Execution Time: 80.704 ms
+*/
+```
+
+Секционированная таблица дает сопоставимую производительность без индексов.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.ticket_flights WHERE fare_conditions = 'Business';
+/*
+ Seq Scan on ticket_flights_b ticket_flights  (cost=0.00..17909.70 rows=859656 width=33) (actual time=0.021..69.241 rows=859656 loops=1)
+   Filter: ((fare_conditions)::text = 'Business'::text)
+ Planning Time: 0.235 ms
+ Execution Time: 92.205 ms
+*/
+```
+
+#### Выборка с отрицанием
+
+Еще одно преимущество, которое дает секционированная таблица, это когда выборка происходит с отрицанием.
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings.ticket_flights WHERE fare_conditions != 'Economy';
+/*
+ Seq Scan on ticket_flights  (cost=0.00..174858.03 rows=1016532 width=32) (actual time=3.578..308.259 rows=999621 loops=1)
+   Filter: ((fare_conditions)::text <> 'Economy'::text)
+   Rows Removed by Filter: 7392231
+ Planning Time: 0.286 ms
+ JIT:
+   Functions: 2
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 0.407 ms, Inlining 0.000 ms, Optimization 0.418 ms, Emission 3.130 ms, Total 3.954 ms
+ Execution Time: 328.884 ms
+*/
+
+EXPLAIN ANALYZE SELECT * FROM bookings_copy.ticket_flights WHERE fare_conditions != 'Economy';
+/*
+ Append  (cost=0.00..25824.37 rows=999621 width=33) (actual time=0.013..106.298 rows=999621 loops=1)
+   ->  Seq Scan on ticket_flights_b ticket_flights_1  (cost=0.00..17909.70 rows=859656 width=33) (actual time=0.012..56.679 rows=859656 loops=1)
+         Filter: ((fare_conditions)::text <> 'Economy'::text)
+   ->  Seq Scan on ticket_flights_c ticket_flights_2  (cost=0.00..2916.56 rows=139965 width=33) (actual time=0.016..6.641 rows=139965 loops=1)
+         Filter: ((fare_conditions)::text <> 'Economy'::text)
+ Planning Time: 0.744 ms
+ Execution Time: 129.129 ms
+*/
+```
