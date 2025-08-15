@@ -9,10 +9,10 @@
 
 ## Разворачивание базы данных полетов
 
-Для решения домашнего задания предлагается использовать подготовленную демонстрационную базу данных с сайта 
+Для решения домашнего задания предлагается использовать подготовленную демонстрационную базу данных с сайта
 https://postgrespro.ru/docs/postgrespro/17/demodb-bookings.
 
-Перейдите в раздел [Установка](https://postgrespro.ru/docs/postgrespro/17/demodb-bookings-installation) и скопируйте ссылку на ту версию 
+Перейдите в раздел [Установка](https://postgrespro.ru/docs/postgrespro/17/demodb-bookings-installation) и скопируйте ссылку на ту версию
 БД, которой хотите пользоваться.
 
 Зайдите на свой сервер PostgreSQL через SSH, скачайте и распакуйте демо БД.
@@ -123,8 +123,8 @@ ORDER BY seat_letter;
 (10 rows)
 ```
 
-Распределение не самое оптимальное, а главное — такое разделение вряд ли удовлетворит запросы бизнеса. Вероятно, тем, кто анализирует 
-данные, будет неинтересно смотреть на загрузку рядов A, B, C и так далее. Гораздо важнее понять, какие места заняты на конкретном рейсе, 
+Распределение не самое оптимальное, а главное — такое разделение вряд ли удовлетворит запросы бизнеса. Вероятно, тем, кто анализирует
+данные, будет неинтересно смотреть на загрузку рядов A, B, C и так далее. Гораздо важнее понять, какие места заняты на конкретном рейсе,
 что отражает поле `flight_id`. Поэтому следует выполнять группировку по диапазону из 100 000 рейсов.
 
 ```sql
@@ -145,7 +145,7 @@ ORDER BY flight_id_group;
 (3 rows)
 ```
 
-Уже намного лучше, хоть и есть периоды времени, когда билеты покупали мало, поэтому при том же количестве рейсов на них меньше 
+Уже намного лучше, хоть и есть периоды времени, когда билеты покупали мало, поэтому при том же количестве рейсов на них меньше
 посадочных талонов. Остановимся пока на этом варианте, и перейдем ко второй по размеру таблице.
 
 ### Анализ ticket_flights
@@ -211,17 +211,18 @@ ORDER BY flight_id_group;
 (10 rows)
 ```
 
-Самое логичное разбиение тут — по идентификатору билета. Идентификатор представляет собой текстовое поле из 13 символов, которое по 
+Самое логичное разбиение тут — по идентификатору билета. Идентификатор представляет собой текстовое поле из 13 символов, которое по
 международным стандартам состоит из:
+
 * 000 — код авиакомпании,
 * 5432000284 — уникальный номер самого билета.
 
-Таким образом у каждой авиакомпании есть возможность реализовать 10 млрд. билетов (при условии если первый будет иметь №0000000000). А 
+Таким образом у каждой авиакомпании есть возможность реализовать 10 млрд. билетов (при условии если первый будет иметь №0000000000). А
 для нас эта информация дает понимание, что мы можем секционировать эту таблицу по следующим критериям:
 
-1. Если разделить это на 10 секций, то управлять ими будет затруднительно, так как каждая секция будет содержать 1 млрд. записей, что 
+1. Если разделить это на 10 секций, то управлять ими будет затруднительно, так как каждая секция будет содержать 1 млрд. записей, что
    повлияет на скорость запросов.
-2. Если разделить это на 100 секций, то управлять ими будет просто, а каждая секция будет содержать 100 млн. записей, что при наличии 
+2. Если разделить это на 100 секций, то управлять ими будет просто, а каждая секция будет содержать 100 млн. записей, что при наличии
    индекса на `ticket_no`, должно обеспечить нормальную скорость запросов.
 3. Возможно стоит рассмотреть 200, 500 или 1000 секций, но для этого надо оценивать производительность каждого случая.
 
@@ -306,18 +307,15 @@ ORDER BY year;
 
 Остановимся на этом варианте.
 
-
 ## Определение типа секционирования
 
-Из представленного анализа видно, что выбранные таблицы являются самыми большими и высоко нагруженными, поэтому проведем секционирование 
+Из представленного анализа видно, что выбранные таблицы являются самыми большими и высоко нагруженными, поэтому проведем секционирование
 каждой из них, при этом:
 
-1. `boarding_passes` секционируем с помощью простого `RANGE`, так как ключ секционирования это число
-2. `ticket_flights` секционируем с помощью `LIST` по полю `fare_conditions`, чисто для эксперимента
-3. `tickets` секционируем с помощью `HASH`, так как ключ секционирования это строка
-4. `bookings` секционируем с помощью `RANGE`, так как ключ секционирования это дата
-
-## Секционирование boarding_passes
+1. `ticket_flights` секционируем с помощью `LIST` по полю `fare_conditions`, чисто для эксперимента
+2. `boarding_passes` секционируем с помощью простого `RANGE`, так как ключ секционирования это число
+3. `bookings` секционируем с помощью `RANGE`, так как ключ секционирования это дата
+4. `tickets` секционируем с помощью `HASH`, так как ключ секционирования это строка
 
 Секционирование будем проводить в другой схеме, поэтому создадим ее предварительно для всех таблиц.
 
@@ -326,7 +324,165 @@ DROP SCHEMA IF EXISTS bookings_copy CASCADE;
 CREATE SCHEMA bookings_copy;
 ```
 
-Создаем секционированную таблицу, скрипт создания получен через pgAdmin4.
+## Секционирование bookings
+
+Создаем секционированную таблицу, скрипт создания получен через pgAdmin4. Так как секционирование идет по полю `book_date` — оно было
+добавлено как PRIMARY KEY.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.bookings
+(
+    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
+    book_date timestamp with time zone NOT NULL,
+    total_amount numeric(10,2) NOT NULL,
+    CONSTRAINT bookings_pkey PRIMARY KEY (book_ref, book_date)
+) PARTITION BY RANGE (book_date);
+
+CREATE TABLE bookings_copy.bookings_2016 PARTITION OF bookings_copy.bookings
+	FOR VALUES FROM ('2016-01-01') TO ('2017-01-01');
+CREATE TABLE bookings_copy.bookings_2017 PARTITION OF bookings_copy.bookings
+	FOR VALUES FROM ('2017-01-01') TO ('2018-01-01');
+
+ -- 0min 3sec
+INSERT INTO bookings_copy.bookings
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.bookings;
+
+VACUUM ANALYZE bookings_copy.bookings;
+```
+
+## Секционирование tickets
+
+Данная таблица создается второй с одним важным изменением.
+
+Дело в том, что в исходной БД таблица `tickets` ссылается на `bookings`
+посредством FOREIGN KEY, но в PostgreSQL существует важное ограничение: внешние ключи не поддерживаются между секционированными таблицами,
+если ключ секционирования отличается или если связи не выстроены строго по ключам секционирования.
+
+В нашем случае:
+
+* Таблица `bookings` секционирована по диапазону по полю `book_date`.
+* Таблица `tickets` по хешу по полю `ticket_no`.
+* Внешний ключ надо сделать по полю `book_ref`, которого в ключе секционирования `bookings` нет, а в `tickets` нет поля с ключом
+  секционирования `book_date`.
+
+Из-за этого прямой внешний ключ поставить нельзя — это архитектурное ограничение PostgreSQL. Поэтому создаем секционированную таблицу 
+без внешнего ключа и наполняем данными.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.tickets
+(
+    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
+    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
+    passenger_id character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    passenger_name text COLLATE pg_catalog."default" NOT NULL,
+    contact_data jsonb,
+    CONSTRAINT tickets_pkey PRIMARY KEY (ticket_no)
+    -- ,
+    -- CONSTRAINT tickets_book_ref_fkey FOREIGN KEY (book_ref)
+    --     REFERENCES bookings_copy.bookings (book_ref) MATCH SIMPLE
+    --     ON UPDATE NO ACTION
+    --     ON DELETE NO ACTION
+) PARTITION BY HASH (ticket_no);
+
+CREATE TABLE bookings_copy.tickets_0 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 0);
+CREATE TABLE bookings_copy.tickets_1 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 1);
+CREATE TABLE bookings_copy.tickets_2 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 2);
+CREATE TABLE bookings_copy.tickets_3 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 3);
+CREATE TABLE bookings_copy.tickets_4 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 4);
+CREATE TABLE bookings_copy.tickets_5 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 5);
+CREATE TABLE bookings_copy.tickets_6 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 6);
+CREATE TABLE bookings_copy.tickets_7 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 7);
+CREATE TABLE bookings_copy.tickets_8 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 8);
+CREATE TABLE bookings_copy.tickets_9 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 9);
+
+ -- 0min 18sec
+INSERT INTO bookings_copy.tickets
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.tickets;
+
+VACUUM ANALYZE bookings_copy.tickets;
+```
+
+### Как строить архитектуру с секционированием и связью?
+
+#### Вариант 1: Не создавать внешний ключ в БД, а контролировать целостность на уровне приложения
+
+* Это самый простой вариант, если архитектура сложная.
+* Секционируете обе таблицы независимо, без внешних ключей.
+* Логику связи и проверки целостности выполняете в приложении.
+
+#### Вариант 2: Использовать одинаковое секционирование и ключи, чтобы внешний ключ был валиден
+
+* Секционировать и `bookings`, и `tickets` одинаково, например, по `book_ref` и `book_date` (составной ключ).
+* В таблице `tickets` добавить поля `book_ref` и `book_date` и сделать составной внешний ключ на `(book_ref, book_date)`.
+
+#### Вариант 3: Создать денормализованное поле в tickets с нужным ключом секционирования
+
+* Добавить поле `book_date` в `tickets` и поддерживать его через триггер вставки/обновления с копированием из `bookings`.
+* Тогда можно сделать одинаковое секционирование и внешний ключ.
+* Минус — дублирование данных, возможны рассинхронизации.
+
+### ЧТО ДЕЛАТЬ?!
+
+Ничего. В жизни мы бы использовали либо секционирование для `bookings` по первичному ключу, либо пошли по **Варианту 1**. А в случае с 
+домашним заданием нам:
+
+1. интересно провести секционирование по дате
+2. интересно попасть в подобную ситуацию, чтобы начать в ней разбираться
+
+## Секционирование ticket_flights
+
+Создаем следующую секционированную таблицу. Обратите внимание на внешние ключи.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.ticket_flights
+(
+    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
+    flight_id integer NOT NULL,
+    fare_conditions character varying(10) COLLATE pg_catalog."default" NOT NULL,
+    amount numeric(10,2) NOT NULL,
+    CONSTRAINT ticket_flights_pkey PRIMARY KEY (ticket_no, flight_id, fare_conditions),
+    CONSTRAINT ticket_flights_flight_id_fkey FOREIGN KEY (flight_id)
+        REFERENCES bookings_copy.flights (flight_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT ticket_flights_ticket_no_fkey FOREIGN KEY (ticket_no)
+        REFERENCES bookings_copy.tickets (ticket_no) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT ticket_flights_amount_check CHECK (amount >= 0::numeric),
+    CONSTRAINT ticket_flights_fare_conditions_check CHECK (fare_conditions::text = ANY (ARRAY['Economy'::character varying::text, 'Comfort'::character varying::text, 'Business'::character varying::text]))
+) PARTITION BY LIST (fare_conditions);
+
+CREATE TABLE bookings_copy.ticket_flights_e PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Economy');
+CREATE TABLE bookings_copy.ticket_flights_c PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Comfort');
+CREATE TABLE bookings_copy.ticket_flights_b PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Business');
+	
+ -- 2min 20sec
+INSERT INTO bookings_copy.ticket_flights
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.ticket_flights;
+
+VACUUM ANALYZE bookings_copy.ticket_flights;
+```
+
+## Секционирование boarding_passes
+
+И последняя секционированная таблица на сегодня.
 
 ```sql
 CREATE TABLE IF NOT EXISTS bookings_copy.boarding_passes
@@ -367,115 +523,4 @@ INSERT INTO bookings_copy.boarding_passes
 	SELECT * FROM bookings.boarding_passes;
 
 VACUUM ANALYZE bookings_copy.boarding_passes;
-```
-
-## Секционирование ticket_flights
-
-По аналогии с предыдущей таблицей проводим те же действия.
-
-```sql
-CREATE TABLE IF NOT EXISTS bookings_copy.ticket_flights
-(
-    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
-    flight_id integer NOT NULL,
-    fare_conditions character varying(10) COLLATE pg_catalog."default" NOT NULL,
-    amount numeric(10,2) NOT NULL,
-    CONSTRAINT ticket_flights_pkey PRIMARY KEY (ticket_no, flight_id, fare_conditions),
-    CONSTRAINT ticket_flights_flight_id_fkey FOREIGN KEY (flight_id)
-        REFERENCES bookings_copy.flights (flight_id) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE NO ACTION,
-    CONSTRAINT ticket_flights_ticket_no_fkey FOREIGN KEY (ticket_no)
-        REFERENCES bookings_copy.tickets (ticket_no) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE NO ACTION,
-    CONSTRAINT ticket_flights_amount_check CHECK (amount >= 0::numeric),
-    CONSTRAINT ticket_flights_fare_conditions_check CHECK (fare_conditions::text = ANY (ARRAY['Economy'::character varying::text, 'Comfort'::character varying::text, 'Business'::character varying::text]))
-) PARTITION BY LIST (fare_conditions);
-
-CREATE TABLE bookings_copy.ticket_flights_e PARTITION OF bookings_copy.ticket_flights
-	FOR VALUES IN ('Economy');
-CREATE TABLE bookings_copy.ticket_flights_c PARTITION OF bookings_copy.ticket_flights
-	FOR VALUES IN ('Comfort');
-CREATE TABLE bookings_copy.ticket_flights_b PARTITION OF bookings_copy.ticket_flights
-	FOR VALUES IN ('Business');
-	
- -- 1min 30sec
-INSERT INTO bookings_copy.ticket_flights
-	OVERRIDING SYSTEM VALUE
-	SELECT * FROM bookings.ticket_flights;
-
-VACUUM ANALYZE bookings_copy.ticket_flights;
-```
-
-## Секционирование bookings
-
-```sql
-CREATE TABLE IF NOT EXISTS bookings_copy.bookings
-(
-    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
-    book_date timestamp with time zone NOT NULL,
-    total_amount numeric(10,2) NOT NULL,
-    CONSTRAINT bookings_pkey PRIMARY KEY (book_ref, book_date)
-) PARTITION BY RANGE (book_date);
-
-CREATE TABLE bookings_copy.bookings_2016 PARTITION OF bookings_copy.bookings
-	FOR VALUES FROM ('2016-01-01') TO ('2017-01-01');
-CREATE TABLE bookings_copy.bookings_2017 PARTITION OF bookings_copy.bookings
-	FOR VALUES FROM ('2017-01-01') TO ('2018-01-01');
-
- -- 0min 3sec
-INSERT INTO bookings_copy.bookings
-	OVERRIDING SYSTEM VALUE
-	SELECT * FROM bookings.bookings;
-
-VACUUM ANALYZE bookings_copy.bookings;
-```
-
-## Секционирование tickets
-
-По аналогии с предыдущей таблицей проводим те же действия.
-
-```sql
-CREATE TABLE IF NOT EXISTS bookings_copy.tickets
-(
-    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
-    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
-    passenger_id character varying(20) COLLATE pg_catalog."default" NOT NULL,
-    passenger_name text COLLATE pg_catalog."default" NOT NULL,
-    contact_data jsonb,
-    CONSTRAINT tickets_pkey PRIMARY KEY (ticket_no),
-    CONSTRAINT tickets_book_ref_fkey FOREIGN KEY (book_ref)
-        REFERENCES bookings_copy.bookings (book_ref) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE NO ACTION
-) PARTITION BY HASH (ticket_no);
-
-CREATE TABLE bookings_copy.tickets_0 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 0);
-CREATE TABLE bookings_copy.tickets_1 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 1);
-CREATE TABLE bookings_copy.tickets_2 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 2);
-CREATE TABLE bookings_copy.tickets_3 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 3);
-CREATE TABLE bookings_copy.tickets_4 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 4);
-CREATE TABLE bookings_copy.tickets_5 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 5);
-CREATE TABLE bookings_copy.tickets_6 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 6);
-CREATE TABLE bookings_copy.tickets_7 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 7);
-CREATE TABLE bookings_copy.tickets_8 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 8);
-CREATE TABLE bookings_copy.tickets_9 PARTITION OF bookings_copy.tickets
-   FOR VALUES WITH (MODULUS 10, REMAINDER 9);
-
- -- 0min 18sec
-INSERT INTO bookings_copy.tickets
-	OVERRIDING SYSTEM VALUE
-	SELECT * FROM bookings.tickets;
-
-VACUUM ANALYZE bookings_copy.tickets;
 ```
