@@ -317,3 +317,165 @@ ORDER BY year;
 3. `tickets` секционируем с помощью `HASH`, так как ключ секционирования это строка
 4. `bookings` секционируем с помощью `RANGE`, так как ключ секционирования это дата
 
+## Секционирование boarding_passes
+
+Секционирование будем проводить в другой схеме, поэтому создадим ее предварительно для всех таблиц.
+
+```sql
+DROP SCHEMA IF EXISTS bookings_copy CASCADE;
+CREATE SCHEMA bookings_copy;
+```
+
+Создаем секционированную таблицу, скрипт создания получен через pgAdmin4.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.boarding_passes
+(
+    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
+    flight_id integer NOT NULL,
+    boarding_no integer NOT NULL,
+    seat_no character varying(4) COLLATE pg_catalog."default" NOT NULL,
+	CONSTRAINT boarding_passes_pkey PRIMARY KEY (ticket_no, flight_id),
+	CONSTRAINT boarding_passes_flight_id_boarding_no_key UNIQUE (flight_id, boarding_no),
+	CONSTRAINT boarding_passes_flight_id_seat_no_key UNIQUE (flight_id, seat_no),
+	CONSTRAINT boarding_passes_ticket_no_fkey FOREIGN KEY (ticket_no, flight_id)
+        REFERENCES bookings.ticket_flights (ticket_no, flight_id) MATCH SIMPLE
+		ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+) PARTITION BY RANGE (flight_id);
+```
+
+Создаем секции.
+
+```sql
+CREATE TABLE bookings_copy.boarding_passes_0 PARTITION OF bookings_copy.boarding_passes
+	FOR VALUES FROM (0) TO (100000);
+CREATE TABLE bookings_copy.boarding_passes_1 PARTITION OF bookings_copy.boarding_passes
+	FOR VALUES FROM (100000) TO (200000);
+CREATE TABLE bookings_copy.boarding_passes_2 PARTITION OF bookings_copy.boarding_passes
+	FOR VALUES FROM (200000) TO (300000);
+CREATE TABLE bookings_copy.boarding_passes_3 PARTITION OF bookings_copy.boarding_passes
+	FOR VALUES FROM (300000) TO (400000);
+```
+
+Наполняем данными и собираем статистику.
+
+```sql
+ -- 1min 12sec
+INSERT INTO bookings_copy.boarding_passes
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.boarding_passes;
+
+VACUUM ANALYZE bookings_copy.boarding_passes;
+```
+
+## Секционирование ticket_flights
+
+По аналогии с предыдущей таблицей проводим те же действия.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.ticket_flights
+(
+    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
+    flight_id integer NOT NULL,
+    fare_conditions character varying(10) COLLATE pg_catalog."default" NOT NULL,
+    amount numeric(10,2) NOT NULL,
+    CONSTRAINT ticket_flights_pkey PRIMARY KEY (ticket_no, flight_id, fare_conditions),
+    CONSTRAINT ticket_flights_flight_id_fkey FOREIGN KEY (flight_id)
+        REFERENCES bookings_copy.flights (flight_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT ticket_flights_ticket_no_fkey FOREIGN KEY (ticket_no)
+        REFERENCES bookings_copy.tickets (ticket_no) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION,
+    CONSTRAINT ticket_flights_amount_check CHECK (amount >= 0::numeric),
+    CONSTRAINT ticket_flights_fare_conditions_check CHECK (fare_conditions::text = ANY (ARRAY['Economy'::character varying::text, 'Comfort'::character varying::text, 'Business'::character varying::text]))
+) PARTITION BY LIST (fare_conditions);
+
+CREATE TABLE bookings_copy.ticket_flights_e PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Economy');
+CREATE TABLE bookings_copy.ticket_flights_c PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Comfort');
+CREATE TABLE bookings_copy.ticket_flights_b PARTITION OF bookings_copy.ticket_flights
+	FOR VALUES IN ('Business');
+	
+ -- 1min 30sec
+INSERT INTO bookings_copy.ticket_flights
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.ticket_flights;
+
+VACUUM ANALYZE bookings_copy.ticket_flights;
+```
+
+## Секционирование bookings
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.bookings
+(
+    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
+    book_date timestamp with time zone NOT NULL,
+    total_amount numeric(10,2) NOT NULL,
+    CONSTRAINT bookings_pkey PRIMARY KEY (book_ref, book_date)
+) PARTITION BY RANGE (book_date);
+
+CREATE TABLE bookings_copy.bookings_2016 PARTITION OF bookings_copy.bookings
+	FOR VALUES FROM ('2016-01-01') TO ('2017-01-01');
+CREATE TABLE bookings_copy.bookings_2017 PARTITION OF bookings_copy.bookings
+	FOR VALUES FROM ('2017-01-01') TO ('2018-01-01');
+
+ -- 0min 3sec
+INSERT INTO bookings_copy.bookings
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.bookings;
+
+VACUUM ANALYZE bookings_copy.bookings;
+```
+
+## Секционирование tickets
+
+По аналогии с предыдущей таблицей проводим те же действия.
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings_copy.tickets
+(
+    ticket_no character(13) COLLATE pg_catalog."default" NOT NULL,
+    book_ref character(6) COLLATE pg_catalog."default" NOT NULL,
+    passenger_id character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    passenger_name text COLLATE pg_catalog."default" NOT NULL,
+    contact_data jsonb,
+    CONSTRAINT tickets_pkey PRIMARY KEY (ticket_no),
+    CONSTRAINT tickets_book_ref_fkey FOREIGN KEY (book_ref)
+        REFERENCES bookings_copy.bookings (book_ref) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+) PARTITION BY HASH (ticket_no);
+
+CREATE TABLE bookings_copy.tickets_0 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 0);
+CREATE TABLE bookings_copy.tickets_1 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 1);
+CREATE TABLE bookings_copy.tickets_2 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 2);
+CREATE TABLE bookings_copy.tickets_3 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 3);
+CREATE TABLE bookings_copy.tickets_4 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 4);
+CREATE TABLE bookings_copy.tickets_5 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 5);
+CREATE TABLE bookings_copy.tickets_6 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 6);
+CREATE TABLE bookings_copy.tickets_7 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 7);
+CREATE TABLE bookings_copy.tickets_8 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 8);
+CREATE TABLE bookings_copy.tickets_9 PARTITION OF bookings_copy.tickets
+   FOR VALUES WITH (MODULUS 10, REMAINDER 9);
+
+ -- 0min 18sec
+INSERT INTO bookings_copy.tickets
+	OVERRIDING SYSTEM VALUE
+	SELECT * FROM bookings.tickets;
+
+VACUUM ANALYZE bookings_copy.tickets;
+```
