@@ -200,22 +200,7 @@ DECLARE
 BEGIN
 	CASE TG_OP
 		WHEN 'INSERT' THEN
-		    SELECT good_name, good_price
-		    INTO v_good_name, v_good_price
-		    FROM goods
-		    WHERE goods_id = NEW.good_id;
-
-			v_sum_sale := NEW.sales_qty * v_good_price;
-
-			UPDATE good_sum_mart
-			SET sum_sale = sum_sale + v_sum_sale
-			WHERE good_name = v_good_name;
-		        
-			IF NOT FOUND THEN
-				INSERT INTO good_sum_mart (good_name, sum_sale)
-				VALUES (v_good_name, v_sum_sale);
-			END IF;
-			RETURN NEW;
+		    ...
 		WHEN 'UPDATE' THEN
 			SELECT good_name, good_price
 		    INTO v_good_name, v_good_price
@@ -233,7 +218,9 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 ```
+
 И сам триггер (+ DELETE, чтобы не возвращаться к этому позже)
+
 ```sql
 CREATE OR REPLACE TRIGGER trg_good_sum
 AFTER INSERT OR UPDATE OR DELETE ON sales
@@ -274,5 +261,60 @@ SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
    good_name    | sum_sale 
 ----------------+----------
  Банка кукурузы |    89.00
+*/
+```
+
+## ФТ №5: Обработка события DELETE
+
+Дорабатываем триггерную функцию
+
+```sql
+CREATE OR REPLACE FUNCTION tf_good_sum()
+RETURNS trigger AS
+$$
+DECLARE
+	v_good_name varchar(63);
+	v_good_price numeric(12, 2);
+	v_sum_sale numeric(16, 2);
+BEGIN
+	CASE TG_OP
+		WHEN 'INSERT' THEN
+		    ...
+		WHEN 'UPDATE' THEN
+			...
+		WHEN 'DELETE' THEN
+			SELECT good_name, good_price
+		    INTO v_good_name, v_good_price
+		    FROM goods
+		    WHERE goods_id = OLD.good_id;
+			
+			v_sum_sale := -(OLD.sales_qty * v_good_price);
+
+			UPDATE good_sum_mart
+			SET sum_sale = sum_sale + v_sum_sale
+			WHERE good_name = v_good_name;
+			
+			RETURN OLD;
+	END CASE;
+END
+$$ LANGUAGE plpgsql;
+```
+
+Проверяем
+
+```sql
+SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
+/*
+   good_name    | sum_sale 
+----------------+----------
+ Банка кукурузы |   356.00
+*/
+
+DELETE FROM sales WHERE good_id = 3;
+SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
+/*
+   good_name    | sum_sale 
+----------------+----------
+ Банка кукурузы |     0.00
 */
 ```
