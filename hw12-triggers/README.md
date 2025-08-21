@@ -59,7 +59,7 @@ SELECT G.good_name, sum(G.good_price * S.sales_qty)
 CREATE TABLE good_sum_mart
 (
 	good_name   varchar(63) NOT NULL,
-	sum_sale	numeric(16, 2)NOT NULL
+	sum_sale	numeric(16, 2) NOT NULL
 );
 ```
 
@@ -250,7 +250,7 @@ SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
 /*
    good_name    | sum_sale 
 ----------------+----------
- Банка кукурузы |   356.00
+ Банка кукурузы |   445.00
 */
 
 
@@ -317,4 +317,63 @@ SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
 ----------------+----------
  Банка кукурузы |     0.00
 */
+```
+
+## Рефакторинг функции
+
+После того как убедились, что функция работает, проводим ее рефакторинг и получаем следующий результат
+
+```sql
+CREATE OR REPLACE FUNCTION tf_good_sum()
+RETURNS trigger AS
+$$
+DECLARE
+	v_good_name varchar(63);
+	v_good_price numeric(12, 2);
+	v_sum_sale numeric(16, 2);
+	v_qty_diff integer;
+BEGIN
+	-- Определяем количество проданного товара
+	IF TG_OP = 'INSERT' THEN
+		v_qty_diff := NEW.sales_qty;
+	ELSEIF TG_OP = 'UPDATE' THEN
+		v_qty_diff := NEW.sales_qty - OLD.sales_qty;
+	ELSEIF TG_OP = 'DELETE' THEN
+		v_qty_diff := OLD.sales_qty;
+	ELSE
+		RAISE EXCEPTION 'Неподдерживаемое событие "%s" для триггера %s', TG_OP, TG_NAME;
+	END IF;
+
+	-- Получаем имя и цену товара. Для DELETE берем OLD.good_id, иначе NEW.good_id
+	SELECT good_name, good_price
+		INTO v_good_name, v_good_price
+		FROM goods
+		WHERE goods_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.good_id ELSE NEW.good_id END;
+
+	-- Считаем изменение суммы
+    v_sum_sale := v_qty_diff * v_good_price;
+
+    -- Обновляем или вставляем в good_sum_mart
+	UPDATE good_sum_mart
+    SET sum_sale = sum_sale + v_sum_sale
+    WHERE good_name = v_good_name;
+
+	IF NOT FOUND THEN
+        INSERT INTO good_sum_mart(good_name, sum_sale)
+        VALUES (v_good_name, v_sum_sale);
+    END IF;
+
+	-- Возвращаем NEW для INSERT и UPDATE, OLD для DELETE
+	IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_good_sum
+AFTER INSERT OR UPDATE OR DELETE ON sales
+FOR EACH ROW
+EXECUTE FUNCTION tf_good_sum();
 ```
