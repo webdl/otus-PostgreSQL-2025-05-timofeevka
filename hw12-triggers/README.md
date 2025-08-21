@@ -90,3 +90,25 @@ CREATE TABLE good_sum_mart
     2. Вычитаем полученную сумму из `sales.sales_qty`
 
 # Решение домашнего задания
+
+## ФТ №1: Заполнение таблицы good_sum_mart
+
+```sql
+INSERT INTO good_sum_mart (good_name, sum_sale)
+SELECT G.good_name, sum(G.good_price * S.sales_qty)
+	FROM goods G
+	INNER JOIN sales S ON S.good_id = G.goods_id
+	GROUP BY G.good_name;
+ 
+-- Проверяем данные
+SELECT * FROM good_sum_mart;
+
+/*
+        good_name         |   sum_sale   
+--------------------------+--------------
+ Автомобиль Ferrari FXX K | 185000000.01
+ Спички хозайственные     |        65.50
+(2 rows)
+*/
+```
+
