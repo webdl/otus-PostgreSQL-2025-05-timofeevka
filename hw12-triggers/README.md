@@ -112,3 +112,75 @@ SELECT * FROM good_sum_mart;
 */
 ```
 
+## ФТ №2,3: Функция и триггер на событие INSERT
+
+Создаем новую функцию, которая умеет пока только обрабатывать события INSERT
+
+```sql
+CREATE OR REPLACE FUNCTION tf_good_sum()
+RETURNS trigger AS
+$$
+DECLARE
+	v_good_name varchar(63);
+	v_good_price numeric(12, 2);
+	v_sum_sale numeric(16, 2);
+BEGIN
+	CASE TG_OP
+		WHEN 'INSERT' THEN
+		    SELECT good_name, good_price
+		    INTO v_good_name, v_good_price
+		    FROM goods
+		    WHERE goods_id = NEW.good_id;
+
+			v_sum_sale := NEW.sales_qty * v_good_price;
+
+			UPDATE good_sum_mart
+			SET sum_sale = sum_sale + v_sum_sale
+			WHERE good_name = v_good_name;
+		        
+			IF NOT FOUND THEN
+				INSERT INTO good_sum_mart (good_name, sum_sale)
+				VALUES (v_good_name, v_sum_sale);
+			END IF;
+			RETURN NEW;
+	END CASE;
+END
+$$ LANGUAGE plpgsql;
+```
+
+И регистрируем триггер
+
+```sql
+CREATE TRIGGER trg_good_sum
+AFTER INSERT ON sales
+FOR EACH ROW
+EXECUTE FUNCTION tf_good_sum();
+```
+
+Проверяем
+
+```sql
+-- Для существующих товаров
+INSERT INTO sales (good_id, sales_qty) VALUES (1, 10);
+SELECT * FROM good_sum_mart;
+/*
+        good_name         |   sum_sale   
+--------------------------+--------------
+ Автомобиль Ferrari FXX K | 185000000.01
+ Спички хозайственные     |        85.50
+(2 rows)
+*/
+
+-- Для новых товаров
+INSERT INTO goods (goods_id, good_name, good_price) VALUES (3, 'Банка кукурузы', 89);
+INSERT INTO sales (good_id, sales_qty) VALUES (3, 4);
+SELECT * FROM good_sum_mart;
+/*
+        good_name         |   sum_sale   
+--------------------------+--------------
+ Автомобиль Ferrari FXX K | 185000000.01
+ Спички хозайственные     |        85.50
+ Банка кукурузы           |       356.00
+(3 rows)
+*/
+```
