@@ -82,7 +82,7 @@ CREATE TABLE good_sum_mart
         1. Если запись не найдена — производит вставку новой записи
         2. Если запись найдена — добавляет сумму к числу в колонке `sum_sale`
 4. При событии `UPDATE` триггер:
-    1. Вычитает из предыдущего количества товаров (`sales.sales_qty`) новое значение
+    1. Вычитает из нового количества товаров (`sales.sales_qty`) предыдущее значение
     2. Полученное число умножает на текущую стоимость (`goods.good_price`)
     3. Прибавляет полученную сумму к текущей сумме в `sales.sales_qty` по данному товару
 5. При событии `DELETE` триггер:
@@ -182,5 +182,97 @@ SELECT * FROM good_sum_mart;
  Спички хозайственные     |        85.50
  Банка кукурузы           |       356.00
 (3 rows)
+*/
+```
+
+## ФТ №4: Обработка события UPDATE
+
+Дорабатываем триггерную функцию
+
+```sql
+CREATE OR REPLACE FUNCTION tf_good_sum()
+RETURNS trigger AS
+$$
+DECLARE
+	v_good_name varchar(63);
+	v_good_price numeric(12, 2);
+	v_sum_sale numeric(16, 2);
+BEGIN
+	CASE TG_OP
+		WHEN 'INSERT' THEN
+		    SELECT good_name, good_price
+		    INTO v_good_name, v_good_price
+		    FROM goods
+		    WHERE goods_id = NEW.good_id;
+
+			v_sum_sale := NEW.sales_qty * v_good_price;
+
+			UPDATE good_sum_mart
+			SET sum_sale = sum_sale + v_sum_sale
+			WHERE good_name = v_good_name;
+		        
+			IF NOT FOUND THEN
+				INSERT INTO good_sum_mart (good_name, sum_sale)
+				VALUES (v_good_name, v_sum_sale);
+			END IF;
+			RETURN NEW;
+		WHEN 'UPDATE' THEN
+			SELECT good_name, good_price
+		    INTO v_good_name, v_good_price
+		    FROM goods
+		    WHERE goods_id = NEW.good_id;
+
+			v_sum_sale := (NEW.sales_qty - OLD.sales_qty) * v_good_price;
+
+			UPDATE good_sum_mart
+			SET sum_sale = sum_sale + v_sum_sale
+			WHERE good_name = v_good_name;
+
+			RETURN NEW;
+	END CASE;
+END
+$$ LANGUAGE plpgsql;
+```
+И сам триггер (+ DELETE, чтобы не возвращаться к этому позже)
+```sql
+CREATE OR REPLACE TRIGGER trg_good_sum
+AFTER INSERT OR UPDATE OR DELETE ON sales
+FOR EACH ROW
+EXECUTE FUNCTION tf_good_sum();
+```
+
+И проверяем
+
+```sql
+SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';          
+/*
+   good_name    | sum_sale 
+----------------+----------
+ Банка кукурузы |   356.00
+*/
+
+SELECT * FROM sales WHERE sales_id = 9;
+/*
+ sales_id | good_id |          sales_time           | sales_qty 
+----------+---------+-------------------------------+-----------
+        9 |       3 | 2025-08-21 12:45:44.533648+00 |         4
+*/
+
+UPDATE sales SET sales_qty = 5 WHERE sales_id = 9;
+SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
+/*
+   good_name    | sum_sale 
+----------------+----------
+ Банка кукурузы |   356.00
+*/
+
+
+-- В обратную сторону
+UPDATE sales SET sales_qty = 1 WHERE sales_id = 9;
+SELECT * FROM good_sum_mart WHERE good_name = 'Банка кукурузы';
+/*
+   good_name    | sum_sale 
+----------------+----------
+ Банка кукурузы |    89.00
 */
 ```
