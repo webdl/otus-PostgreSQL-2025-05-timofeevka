@@ -1,0 +1,11 @@
+---
+- name: Установка и настройка сервера PostgreSQL 16
+  hosts: db, mini_db
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Установка Unzip
+      ansible.builtin.apt:
+        name: unzip
+        state: present
