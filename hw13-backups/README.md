@@ -436,7 +436,73 @@ stat -c '%s bytes' backups.dump.gz
 1676 bytes
 ```
 
-Видим, что использование ключа `-Z 9` (максимальное сжатие) в `pg_dump` не дает такого же эффекта, как использование gzip со сжатием 
-по-умолчанию (6). Это связано с тем, что встроенное сжатие pg_dump «на лету» происходит во время записи дампа, что может ограничивать 
-эффективность из-за особенностей потока и взаимодействия с форматом дампа. В то же время внешний gzip работает с полным файлом и 
+Видим, что использование ключа `-Z 9` (максимальное сжатие) в `pg_dump` не дает такого же эффекта, как использование gzip со сжатием
+по-умолчанию (6). Это связано с тем, что встроенное сжатие pg_dump «на лету» происходит во время записи дампа, что может ограничивать
+эффективность из-за особенностей потока и взаимодействия с форматом дампа. В то же время внешний gzip работает с полным файлом и
 может более эффективно оптимизировать сжатие, так как оперирует целым файлом, а не блоками данных.
+
+## Восстановление данных
+
+Создадим новую БД для восстановления данных:
+
+```sql
+CREATE DATABASE restored;
+```
+
+Восстанавливаем в нее таблицу `users_copy` из `backups.dump`:
+
+```shell
+pg_restore -d restored -t users_copy backups.dump
+```
+
+Но получим ошибку:
+
+```
+pg_restore: error: could not execute query: ERROR:  relation "public.users_id_seq" does not exist
+LINE 2:     id integer DEFAULT nextval('public.users_id_seq'::regcla...
+                                       ^
+Command was: CREATE TABLE public.users_copy (
+    id integer DEFAULT nextval('public.users_id_seq'::regclass) NOT NULL,
+    name character varying(255) NOT NULL,
+    email character varying(255) NOT NULL
+);
+
+
+pg_restore: error: could not execute query: ERROR:  relation "public.users_copy" does not exist
+Command was: ALTER TABLE public.users_copy OWNER TO postgres;
+
+pg_restore: error: could not execute query: ERROR:  relation "public.users_copy" does not exist
+Command was: COPY public.users_copy (id, name, email) FROM stdin;
+pg_restore: warning: errors ignored on restore: 3
+```
+
+Связана она с тем, что `pg_restore` с ключом `-t` восстанавливает только структуру и данные самой таблицы, без связанных
+последовательностей. В результате ссылка на функцию `nextval('public.users_id_seq'::regclass)` в столбце `id` оказывается "битой", так как
+последовательность отсутствует.
+
+Чтобы решить эту проблему можно:
+
+1. Восстановить всю схему (без ограничения на таблицу);
+2. Восстановить вручную последовательности, указав их с помощью дополнительного ключа `-t` для последовательностей;
+
+Воспользуемся вторым вариантом:
+
+```shell
+pg_restore -d restored -t users_copy -t users_id_seq backups.dump
+```
+
+Проверяем:
+
+```shell
+psql restored
+```
+
+```
+restored=# \dt
+           List of relations
+ Schema |    Name    | Type  |  Owner
+--------+------------+-------+----------
+ public | users_copy | table | postgres
+```
+
+Таким образом мы успешно восстановили только таблицу в другую базу данных.
