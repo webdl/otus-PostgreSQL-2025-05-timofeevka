@@ -54,14 +54,25 @@ COPY users_copy FROM '/var/lib/postgresql/backups/users.csv' WITH DELIMITER '|' 
 SELECT * FROM users_copy;
 ```
 
-## Простое РК с помощью pg_dump
+## РК с помощью pg_dump без сжатия
 
 Зайдем на сервер и выполним резервное копирование:
 
 ```shell
 cd ~/backups
-pg_dump -Fc backups > backups.sql
+pg_dump backups > backups.sql
+```
 
+Посмотрим на размер файла:
+
+```shell
+stat -c '%s bytes' backups.sql
+8708 bytes
+```
+
+И на его содержимое:
+
+```shell
 cat backups.sql
 ```
 
@@ -403,8 +414,29 @@ ALTER TABLE ONLY public.users
 --
 ```
 
+## РК с помощью pg_dump со сжатием
+
+Зайдем на сервер и выполним резервное копирование:
 
 ```shell
 cd ~/backups
-pg_dump -Fc -Z 9 backups > backups.sql
+pg_dump -Fc -Z 9 backups > backups.dump
+
+stat -c '%s bytes' backups.dump
+9139 bytes
 ```
+
+И второй вариант, когда для сжатия используется внешняя утилита gzip:
+
+```shell
+cd ~/backups
+pg_dump -Fc backups | gzip > backups.dump.gz
+
+stat -c '%s bytes' backups.dump.gz
+1676 bytes
+```
+
+Видим, что использование ключа `-Z 9` (максимальное сжатие) в `pg_dump` не дает такого же эффекта, как использование gzip со сжатием 
+по-умолчанию (6). Это связано с тем, что встроенное сжатие pg_dump «на лету» происходит во время записи дампа, что может ограничивать 
+эффективность из-за особенностей потока и взаимодействия с форматом дампа. В то же время внешний gzip работает с полным файлом и 
+может более эффективно оптимизировать сжатие, так как оперирует целым файлом, а не блоками данных.
