@@ -57,3 +57,167 @@ pg-slave03                 : ok=36   changed=1    unreachable=0    failed=0    s
 ```
 
 # Решение домашнего задания
+
+## Логическая репликация
+
+### Настройка серверов PostgreSQL
+
+Для работы логической репликации требуется поменять параметр `wal_level` в файле `postgresql.conf`, который принимает следующие значения:
+
+* minimal — минимальный уровень журналирования, записывается только необходимая информация для восстановления после сбоев. Используется
+  без репликации и архивирования WAL, позволяет ускорить некоторые операции, но не поддерживает репликацию.
+* replica (по умолчанию) — записывается информация, необходимая для поддержки репликации и архивирования WAL, включая возможность чтения
+  только с ведомой базы.
+* logical — самый высокий уровень, записывается дополнительная информация, необходимая для логического декодирования изменений и
+  логической репликации.
+
+Обратите внимание:
+Каждый следующий уровень включает информацию всех предыдущих. Настройка этого параметра влияет на производительность, объем генерируемых
+WAL и функциональность репликации и резервного копирования.
+
+Для настройки логической репликации устанавливаем его в значение `logical` через [db.yml](../deploy/vm/group_vars/db.yml) и применяем ко
+всем ВМ.
+
+```shell
+ansible-playbook playbooks/main.yml
+```
+
+```
+changed: [pg-slave02] => (item={'option': 'wal_level', 'value': 'logical'})
+--- before: /etc/postgresql/16/main/postgresql.conf (content)
++++ after: /etc/postgresql/16/main/postgresql.conf (content)
+@@ -206,11 +206,11 @@
+ # WRITE-AHEAD LOG
+ #------------------------------------------------------------------------------
+ 
+ # - Settings -
+ 
+-#wal_level = replica                   # minimal, replica, or logical
++wal_level = 'logical'
+...
+RUNNING HANDLER [geerlingguy.postgresql : restart postgresql] ******************************************************
+[WARNING]: Ignoring "sleep" as it is not used in "systemd"
+changed: [pg-slave02]
+changed: [pg-master]
+changed: [pg-slave01]
+changed: [pg-slave03]
+...
+PLAY RECAP **********************************************************************************************************
+pg-master                  : ok=37   changed=3    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
+pg-slave01                 : ok=37   changed=3    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
+pg-slave02                 : ok=37   changed=3    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
+pg-slave03                 : ok=37   changed=3    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0
+```
+
+### Настройка логической репликации
+
+На `pg-master` и `pg-slave01` создаем БД, таблицы в ней и УЗ для репликации:
+
+```sql
+CREATE DATABASE replica;
+
+CREATE TABLE table1 (
+	id SERIAL PRIMARY KEY,
+	name TEXT
+);
+
+CREATE TABLE table2 (
+	id SERIAL PRIMARY KEY,
+	name TEXT
+);
+
+CREATE ROLE replica_user WITH
+	LOGIN
+	REPLICATION
+	PASSWORD 'replica_user';
+
+GRANT SELECT ON TABLE public.table1 TO replica_user;
+GRANT SELECT ON TABLE public.table2 TO replica_user;
+```
+
+Настраиваем публикацию `table1` на сервере `pg-master`:
+
+```sql
+CREATE PUBLICATION table1
+    FOR TABLE public.table1
+    WITH (publish = 'insert, update, delete, truncate', publish_via_partition_root = false);
+```
+
+Настраиваем на сервере `pg-slave01` подписку на `table1` с `pg-master`:
+
+```sql
+CREATE SUBSCRIPTION pg_master_table1
+    CONNECTION 'host=192.168.0.240 port=5432 user=replica_user password=replica_user dbname=replica connect_timeout=10 sslmode=prefer'
+    PUBLICATION table1
+    WITH (connect = true, enabled = true, copy_data = true, create_slot = true, synchronous_commit = 'off', binary = false, 
+    streaming = 'False', two_phase = false, disable_on_error = false, run_as_owner = false, password_required = true, origin = 'any');
+```
+
+Настраиваем публикацию `table2` на `pg-slave01`:
+
+```sql
+CREATE PUBLICATION table2
+    FOR TABLE public.table2
+    WITH (publish = 'insert, update, delete, truncate', publish_via_partition_root = false);
+```
+
+Настраиваем на сервере `pg-master` подписку на `table2` с `pg-slave01`:
+
+```sql
+CREATE SUBSCRIPTION pg_slave01_table2
+    CONNECTION 'host=192.168.0.241 port=5432 user=replica_user password=replica_user dbname=replica connect_timeout=10 sslmode=prefer'
+    PUBLICATION table2
+    WITH (connect = true, enabled = true, copy_data = true, create_slot = true, synchronous_commit = 'off', binary = false, 
+    streaming = 'False', two_phase = false, disable_on_error = false, run_as_owner = false, password_required = true, origin = 'any');
+```
+
+### Проверка репликации
+
+Смортим статус подписки:
+
+```sql
+SELECT * FROM pg_stat_subscription;
+```
+
+```
+ subid |     subname      | pid  | leader_pid | relid | received_lsn |      last_msg_send_time      |     last_msg_receipt_time     | latest_end_lsn |       latest_end_time        
+-------+------------------+------+------------+-------+--------------+------------------------------+-------------------------------+----------------+------------------------------
+ 41015 | pg_master_table1 | 9785 |            |       | 3F/91A8B9D0  | 2025-08-25 17:18:24.67156+00 | 2025-08-25 17:18:24.660765+00 | 3F/91A8B9D0    | 2025-08-25 17:18:24.67156+00
+```
+
+На `pg-master` выполняем вставку:
+
+```sql
+INSERT INTO table1 (name) VALUES ('Some name');
+INSERT INTO table1 (name) VALUES ('Some name2');
+INSERT INTO table1 (name) VALUES ('Some name3');
+
+SELECT * FROM table1;
+```
+
+```
+ id |    name    
+----+------------
+  1 | Some name
+  2 | Some name2
+  3 | Some name3
+```
+
+На `pg-slave01` выполняем выборку:
+
+```sql
+SELECT * FROM table1;
+```
+
+```
+ id |    name    
+----+------------
+  1 | Some name
+  2 | Some name2
+  3 | Some name3
+```
+
+Логическая репликация работает!
+
+### Настройка репликации для table2
+

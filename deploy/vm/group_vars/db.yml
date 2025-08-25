@@ -30,16 +30,18 @@ postgresql_global_config_options:
     value: '37449kB'
   - option: huge_pages
     value: 'off'
+  - option: wal_level
+    value: logical
   - option: min_wal_size
     value: '1GB'
   - option: max_wal_size
     value: '4GB'
   - option: max_worker_processes
-    value: '2'
+    value: '4'
   - option: max_parallel_workers_per_gather
     value: '2'
   - option: max_parallel_workers
-    value: '2'
+    value: '4'
   - option: max_parallel_maintenance_workers
     value: '2'
   - option: checkpoint_timeout
