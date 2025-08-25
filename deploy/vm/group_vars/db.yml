@@ -37,11 +37,11 @@ postgresql_global_config_options:
   - option: max_wal_size
     value: '4GB'
   - option: max_worker_processes
-    value: '4'
+    value: '6'
   - option: max_parallel_workers_per_gather
     value: '2'
   - option: max_parallel_workers
-    value: '4'
+    value: '6'
   - option: max_parallel_maintenance_workers
     value: '2'
   - option: checkpoint_timeout

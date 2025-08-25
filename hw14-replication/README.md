@@ -267,3 +267,41 @@ SELECT * FROM table2;
 ```
 
 Логическая репликация работает!
+
+### Настройка третьего сервера
+
+Третью ВМ будем использовать как реплику для чтения и бэкапов и настроим на ней подписку на `pg-master` и `pg-slave01`:
+
+```sql
+CREATE DATABASE replica;
+
+CREATE TABLE table1 (
+	id SERIAL PRIMARY KEY,
+	name TEXT
+);
+
+CREATE TABLE table2 (
+	id SERIAL PRIMARY KEY,
+	name TEXT
+);
+
+CREATE ROLE replica_user WITH
+	LOGIN
+	REPLICATION
+	PASSWORD 'replica_user';
+
+GRANT SELECT ON TABLE public.table1 TO replica_user;
+GRANT SELECT ON TABLE public.table2 TO replica_user;
+
+CREATE SUBSCRIPTION pg_slave02_table1
+    CONNECTION 'host=192.168.0.240 port=5432 user=replica_user password=replica_user dbname=replica connect_timeout=10 sslmode=prefer'
+    PUBLICATION table1
+    WITH (connect = true, enabled = true, copy_data = true, create_slot = true, synchronous_commit = 'off', binary = false, 
+    streaming = 'False', two_phase = false, disable_on_error = false, run_as_owner = false, password_required = true, origin = 'any');
+
+CREATE SUBSCRIPTION pg_slave01_table2
+    CONNECTION 'host=192.168.0.241 port=5432 user=replica_user password=replica_user dbname=replica connect_timeout=10 sslmode=prefer'
+    PUBLICATION table2
+    WITH (connect = true, enabled = true, copy_data = true, create_slot = true, synchronous_commit = 'off', binary = false, 
+    streaming = 'False', two_phase = false, disable_on_error = false, run_as_owner = false, password_required = true, origin = 'any');
+```
