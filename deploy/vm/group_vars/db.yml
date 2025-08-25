@@ -9,13 +9,13 @@ postgresql_global_config_options:
   - option: log_directory
     value: 'log'
   - option: max_connections
-    value: '30'
+    value: '20'
   - option: shared_buffers
-    value: '4GB'
-  - option: effective_cache_size
-    value: '12GB'
-  - option: maintenance_work_mem
     value: '1GB'
+  - option: effective_cache_size
+    value: '3GB'
+  - option: maintenance_work_mem
+    value: '256MB'
   - option: checkpoint_completion_target
     value: '0.9'
   - option: wal_buffers
@@ -27,7 +27,7 @@ postgresql_global_config_options:
   - option: effective_io_concurrency
     value: '200'
   - option: work_mem
-    value: '123361kB'
+    value: '37449kB'
   - option: huge_pages
     value: 'off'
   - option: min_wal_size
@@ -35,33 +35,33 @@ postgresql_global_config_options:
   - option: max_wal_size
     value: '4GB'
   - option: max_worker_processes
-    value: '4'
+    value: '2'
   - option: max_parallel_workers_per_gather
     value: '2'
   - option: max_parallel_workers
-    value: '4'
+    value: '2'
   - option: max_parallel_maintenance_workers
     value: '2'
   - option: checkpoint_timeout
-    value: '30'
+    value: '60'
   - option: logging_collector
     value: 'on'
   - option: log_checkpoints
     value: 'on'
+  - option: log_lock_waits
+    value: 'on'
+  - option: deadlock_timeout
+    value: '1000ms'
   - option: shared_preload_libraries
     value: 'pg_prewarm, pg_stat_statements'
   - option: pg_prewarm.autoprewarm
     value: 'true'
-  - option: log_lock_waits
-    value: 'on'
-  - option: deadlock_timeout
-    value: '200ms'
 postgresql_users:
   - name: postgres
     password: postgres
 postgresql_hba_entries:
-  - {type: local, database: all, user: postgres, auth_method: peer}
-  - {type: local, database: all, user: all, auth_method: peer}
-  - {type: host, database: all, user: all, address: '127.0.0.1/32', auth_method: "{{ postgresql_auth_method }}"}
-  - {type: host, database: all, user: all, address: '::1/128', auth_method: "{{ postgresql_auth_method }}"}
+  - { type: local, database: all, user: postgres, auth_method: peer }
+  - { type: local, database: all, user: all, auth_method: peer }
+  - { type: host, database: all, user: all, address: '127.0.0.1/32', auth_method: "{{ postgresql_auth_method }}" }
+  - { type: host, database: all, user: all, address: '::1/128', auth_method: "{{ postgresql_auth_method }}" }
   - { type: host, database: all, user: all, address: '0.0.0.0/0', auth_method: md5 }
