@@ -171,9 +171,9 @@ CREATE SUBSCRIPTION pg_slave01_table2
     streaming = 'False', two_phase = false, disable_on_error = false, run_as_owner = false, password_required = true, origin = 'any');
 ```
 
-### Проверка репликации
+### Проверка репликации pg-master -> pg-slave01
 
-Смортим статус подписки:
+Смотрим статус подписки на `pg-slave01`:
 
 ```sql
 SELECT * FROM pg_stat_subscription;
@@ -219,5 +219,51 @@ SELECT * FROM table1;
 
 Логическая репликация работает!
 
-### Настройка репликации для table2
 
+### Проверка репликации pg-slave01 -> pg-master
+
+Смотрим статус подписки на `pg-master`:
+
+```sql
+SELECT * FROM pg_stat_subscription;
+```
+
+```
+ subid |      subname      |  pid  | leader_pid | relid | received_lsn |      last_msg_send_time       |     last_msg_receipt_time     | latest_end_lsn |        latest_end_time        
+-------+-------------------+-------+------------+-------+--------------+-------------------------------+-------------------------------+----------------+-------------------------------
+ 84865 | pg_slave01_table2 | 10081 |            |       | 2/CEA58970   | 2025-08-25 17:37:37.449742+00 | 2025-08-25 17:37:37.470897+00 | 2/CEA58970     | 2025-08-25 17:37:37.449742+00
+```
+
+На `pg-slave01` выполняем вставку:
+
+```sql
+INSERT INTO table2 (name) VALUES ('Some name 1');
+INSERT INTO table2 (name) VALUES ('Some name 2');
+INSERT INTO table2 (name) VALUES ('Some name 3');
+
+SELECT * FROM table2;
+```
+
+```
+ id |    name    
+----+-------------
+  1 | Some name 1
+  2 | Some name 2
+  3 | Some name 3
+```
+
+На `pg-master` выполняем выборку:
+
+```sql
+SELECT * FROM table2;
+```
+
+```
+ id |    name    
+----+-------------
+  1 | Some name 1
+  2 | Some name 2
+  3 | Some name 3
+```
+
+Логическая репликация работает!
