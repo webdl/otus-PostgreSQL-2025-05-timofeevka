@@ -1,0 +1,4 @@
+---
+postgresql_global_config_options:
+  - option: primary_conninfo
+    value: 'host=192.168.0.242 post=5432 user=replica_user password=replica_user'

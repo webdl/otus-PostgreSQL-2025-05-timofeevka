@@ -1,8 +1,22 @@
 ---
 - name: Установка и настройка сервера PostgreSQL 16
-  hosts: db, mini_db
+  hosts: db
   become: yes
   gather_facts: yes
+
+  pre_tasks:
+    - name: Set variables before role
+      set_fact:
+        postgresql_hba_entries: >-
+          {{
+            (hostvars[groups['db'][0]].postgresql_hba_entries | default([])) +
+            (hostvars[inventory_hostname].postgresql_hba_entries | default([]))
+          }}
+        postgresql_global_config_options: >-
+          {{
+            (hostvars[groups['db'][0]].postgresql_global_config_options | default([])) +
+            (hostvars[inventory_hostname].postgresql_global_config_options | default([]))
+          }}
 
   roles:
     - geerlingguy.postgresql
